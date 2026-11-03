@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -35,37 +36,55 @@ var assetsFS embed.FS
 
 // Server 组装所有依赖。
 type Server struct {
-	st    *store.Store
-	cfg   *config.Config
-	col   *collect.Collector
-	nt    *notify.Notifier
-	esi   *esi.Client
-	res   *esi.Resolver
-	cat   *catalog.Syncer
-	zkb   *source.ZKB
-	log   *slog.Logger
-	ver   string
-	start time.Time
-	imgs  *imageCache
+	st        *store.Store
+	cfg       *config.Config
+	col       *collect.Collector
+	nt        *notify.Notifier
+	esi       *esi.Client
+	res       *esi.Resolver
+	cat       *catalog.Syncer
+	zkb       *source.ZKB
+	log       *slog.Logger
+	ver       string
+	start     time.Time
+	imgs      *imageCache
+	auth      *authState
+	loginTmpl *template.Template
 
 	settingsMu sync.Mutex
 }
 
 // New 构造。
 func New(st *store.Store, cfg *config.Config, col *collect.Collector, nt *notify.Notifier,
-	ec *esi.Client, res *esi.Resolver, cat *catalog.Syncer, log *slog.Logger, ver string) *Server {
-	return &Server{st: st, cfg: cfg, col: col, nt: nt, esi: ec, res: res, cat: cat,
+	ec *esi.Client, res *esi.Resolver, cat *catalog.Syncer, log *slog.Logger, ver string) (*Server, error) {
+	s := &Server{st: st, cfg: cfg, col: col, nt: nt, esi: ec, res: res, cat: cat,
 		zkb: source.NewZKB(cfg.UserAgent), log: log, ver: ver, start: time.Now(),
 		imgs: newImageCache(cfg.DataDir, cfg.UserAgent)}
+
+	tmpl, err := template.ParseFS(assetsFS, "assets/login.html")
+	if err != nil {
+		return nil, fmt.Errorf("解析登录页模板失败: %w", err)
+	}
+	s.loginTmpl = tmpl
+	if err := s.initAuth(); err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 // Handler 返回带中间件的路由。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	// 登录页与退出不经过鉴权中间件
+	root := http.NewServeMux()
+	// 健康检查不鉴权：部署脚本和外部监控要能在未登录时探活
+	root.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "uptime": int(time.Since(s.start).Seconds())})
 	})
+	root.HandleFunc("GET /login", s.handleLoginPage)
+	root.HandleFunc("POST /login", s.handleLoginSubmit)
+	root.HandleFunc("GET /logout", s.handleLogout)
 
 	mux.HandleFunc("GET /api/ship/{id}", s.handleShip)
 	mux.HandleFunc("GET /api/overview", s.handleOverview)
@@ -86,7 +105,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/catalog/sync", s.handleCatalogSync)
 
 	mux.HandleFunc("GET /", s.handleStatic)
-	return s.withMiddleware(mux)
+
+	root.Handle("/", s.requireAuth(mux))
+	return s.withMiddleware(root)
 }
 
 func (s *Server) withMiddleware(next http.Handler) http.Handler {

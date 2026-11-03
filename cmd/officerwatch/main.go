@@ -183,9 +183,14 @@ func main() {
 		}
 	}()
 
+	handler, err := web.New(st, cfg, col, nt, ec, res, cat, logger, version)
+	if err != nil {
+		logger.Error("初始化 HTTP 层失败", "err", err)
+		os.Exit(1)
+	}
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           web.New(st, cfg, col, nt, ec, res, cat, logger, version).Handler(),
+		Handler:           handler.Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {

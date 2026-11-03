@@ -7,8 +7,13 @@
   "userAgent": "officerwatch/1.0 (+https://github.com/724686158/officerwatch)",
   "source": "r2z2",
   "zkbIntervalSeconds": 600,
+  "basePath": "/",
+  "_basePath_说明": "挂在 Nginx 子路径时填 /officerwatch/ —— 登录跳转和 cookie 的 Path 都靠它",
+  "_auth_说明": "页面登录口令。留空则不做登录（只监听 127.0.0.1 时可留空）。改完重启生效。",
+  "auth": {
+    "password": ""
+  },
   "logLevel": "info",
-
   "_邮件_说明": "主通道。QQ 邮箱：smtp.qq.com + 587 + 授权码（不是登录密码）。to 支持逗号分隔多个收件人。",
   "smtp": {
     "host": "smtp.qq.com",
@@ -17,13 +22,11 @@
     "pass": "你的SMTP授权码",
     "to": "you@qq.com"
   },
-
   "_webhook_说明": "可选。JSON POST，可接 ntfy / 飞书 / 钉钉的自建网关。",
   "webhook": {
     "url": "",
     "secret": ""
   },
-
   "_onebot_说明": "可选。QQ 群推送依赖 OneBot 机器人服务端，没有就别填（留空即不启用）。",
   "onebot": {
     "url": "",

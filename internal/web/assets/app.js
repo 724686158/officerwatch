@@ -29,6 +29,11 @@
       headers: { 'Content-Type': 'application/json' },
       ...opts,
     });
+    if (res.status === 401) {
+      // 会话过期：回登录页（带一个回跳参数，登录后能回到原来那页）
+      location.href = BASE + 'login';
+      throw new Error('未登录');
+    }
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = { error: text }; }

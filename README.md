@@ -163,6 +163,20 @@ https://zkillboard.com/kill/132697987/
 
 被拦下的击杀仍会入库，状态记 `filtered` 并写明原因 —— 前身是直接丢掉的，事后没法解释"为什么没报"。
 
+## 登录
+
+**不用 Nginx 的 Basic Auth，用应用自己的登录页。** 原因很具体：Chrome/Edge 的 HTTP Basic Auth
+是浏览器**原生弹框**，不允许粘贴口令，也用不了密码管理器——16 位随机口令只能手打。
+
+- 口令在 `config.json` 的 `auth.password`（文件 0600）；留空则不启用登录（只听 `127.0.0.1` 时可以不配）
+- 会话是 HMAC-SHA256 签名的 cookie（30 天、`HttpOnly`、`SameSite=Lax`），签名密钥存在 SQLite 的
+  `meta.session_key`，所以**重启不掉登录**；换密钥就会让所有会话失效
+- 登录失败按 IP 限速（10 分钟 10 次），失败记录进事件表
+- `/healthz` 不鉴权，方便部署脚本和监控探活
+- 部署在子路径时，`config.json` 的 `basePath` 必须写成 `/officerwatch/`，
+  否则登录成功后会一直被踢回登录页（cookie 的 `Path` 对不上）
+- Nginx 那边对应要写 `auth_basic off;`（见 `deploy/nginx-officerwatch.conf`），否则浏览器还是会弹原生框
+
 ## 部署
 
 推荐形态：**服务只监听 `127.0.0.1`，由 Nginx 反代到子路径，鉴权交给 Nginx**。
@@ -173,7 +187,7 @@ https://zkillboard.com/kill/132697987/
 | 程序目录 | `/opt/officerwatch`（或 `~/apps/officerwatch`） |
 | 二进制 | `bin/officerwatch`（CGO-free，约 12 MB，含星体索引） |
 | 数据 | `data/officerwatch.db`（SQLite WAL，备份 = 复制这个目录） |
-| 配置 | `config.json`（**权限必须 0600**，凭据只在这里） |
+| 配置 | `config.json`（**权限必须 0600**，凭据只在这里；含登录口令与 SMTP） |
 | 服务 | `deploy/officerwatch.service`（`Restart=always`、`ProtectSystem=strict`、`MemoryMax=512M`） |
 | 端口 | 默认 `127.0.0.1:8795`，被占就改 `config.json` 的 `listen` |
 | 反代 | `deploy/nginx-officerwatch.conf`（示例是按子路径 `/officerwatch/` 写的） |

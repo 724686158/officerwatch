@@ -44,6 +44,16 @@ type Config struct {
 	} `json:"smtp"`
 
 	LogLevel string `json:"logLevel"` // debug | info | warn | error
+
+	// BasePath 是应用对外的路径前缀（挂在 Nginx 子路径时填 "/officerwatch/"）。
+	// 登录跳转和 cookie 的 Path 都靠它，填错会表现为"登录后又跳回登录页"。
+	BasePath string `json:"basePath"`
+
+	// Auth 页面登录。password 为空则不启用（只监听 127.0.0.1 时可以不配）。
+	// 之所以不用 Nginx Basic Auth：Chrome 的原生弹框不允许粘贴口令。
+	Auth struct {
+		Password string `json:"password"`
+	} `json:"auth"`
 }
 
 // Default 返回默认配置。
@@ -107,6 +117,9 @@ func (c *Config) applyDefaults() {
 	if c.LogLevel == "" {
 		c.LogLevel = "info"
 	}
+	if c.BasePath == "" {
+		c.BasePath = "/"
+	}
 }
 
 // Save 写配置，权限 0600（内含密码）。
@@ -138,6 +151,8 @@ func (c *Config) Mask() map[string]any {
 			"fallbackTo": maskMail(c.SMTP.To),
 		},
 		"userAgent":     c.UserAgent,
+		"basePath":      c.BasePath,
+		"auth":          map[string]any{"enabled": c.Auth.Password != ""},
 		"esiBase":       c.ESIBase,
 		"configIsLocal": true,
 	}
