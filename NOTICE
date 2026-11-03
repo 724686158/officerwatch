@@ -19,7 +19,12 @@ Third-party data and services
    Both are consumed strictly read-only, with a descriptive User-Agent and
    conservative rate limits.
 
-3) Officials' ship-group list (internal/catalog/catalog.go, KnownGroups)
+3) Ship renders / icons
+   Served at runtime by /api/ship/{typeID}, proxied from CCP's image service
+   (https://images.evetech.net) and cached locally under data/cache/ship/.
+   No image files are redistributed in this repository.
+
+4) Officials' ship-group list (internal/catalog/catalog.go, KnownGroups)
    Hand-maintained snapshot of ESI's "Entity" category groups whose names
    contain "Officer". The authoritative source at runtime is ESI itself
    (`/universe/categories/11/` + `/universe/groups/{id}/`).

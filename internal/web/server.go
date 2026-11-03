@@ -46,6 +46,7 @@ type Server struct {
 	log   *slog.Logger
 	ver   string
 	start time.Time
+	imgs  *imageCache
 
 	settingsMu sync.Mutex
 }
@@ -54,7 +55,8 @@ type Server struct {
 func New(st *store.Store, cfg *config.Config, col *collect.Collector, nt *notify.Notifier,
 	ec *esi.Client, res *esi.Resolver, cat *catalog.Syncer, log *slog.Logger, ver string) *Server {
 	return &Server{st: st, cfg: cfg, col: col, nt: nt, esi: ec, res: res, cat: cat,
-		zkb: source.NewZKB(cfg.UserAgent), log: log, ver: ver, start: time.Now()}
+		zkb: source.NewZKB(cfg.UserAgent), log: log, ver: ver, start: time.Now(),
+		imgs: newImageCache(cfg.DataDir, cfg.UserAgent)}
 }
 
 // Handler 返回带中间件的路由。
@@ -65,6 +67,7 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]any{"ok": true, "uptime": int(time.Since(s.start).Seconds())})
 	})
 
+	mux.HandleFunc("GET /api/ship/{id}", s.handleShip)
 	mux.HandleFunc("GET /api/overview", s.handleOverview)
 	mux.HandleFunc("GET /api/kills", s.handleKills)
 	mux.HandleFunc("POST /api/kills/import", s.handleImport)

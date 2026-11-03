@@ -244,7 +244,7 @@ label.field { display: inline-flex; align-items: center; gap: 8px; color: var(--
 .faction-head { display: flex; align-items: center; gap: 10px; margin: 18px 0 10px; }
 .faction-head h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
 .faction-head .line { flex: 1; height: 1px; background: var(--line); }
-.officer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px; }
+.officer-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
 .officer {
   display: flex; align-items: center; gap: 12px; padding: 12px 14px;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card);
@@ -255,8 +255,23 @@ label.field { display: inline-flex; align-items: center; gap: 8px; color: var(--
 .officer .info { flex: 1; min-width: 0; }
 .officer .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .officer .meta { color: var(--faint); font-size: var(--fs-xs); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 舰船缩略图：CCP 官方渲染图经 /api/ship 代理，带占位底色 */
+.officer .thumb {
+  flex: none; width: 64px; height: 64px; border-radius: 12px;
+  object-fit: cover; background: var(--card-2); border: 1px solid var(--line);
+}
+.shipIcon {
+  width: 22px; height: 22px; flex: none; border-radius: 5px; object-fit: cover;
+  background: var(--card-2); border: 1px solid var(--line); vertical-align: -6px;
+}
+.shipCell { display: flex; align-items: center; gap: 8px; }
+.drawer .shipBig {
+  width: 96px; height: 96px; border-radius: 12px; object-fit: cover;
+  background: var(--card-2); border: 1px solid var(--line); float: right; margin: 0 0 10px 14px;
+}
 /* 中文译名一行：译名 + 吨位标签 */
 .officer .zh { display: flex; align-items: center; gap: 6px; margin-top: 1px; color: var(--dim); font-size: var(--fs-sm); }
+.officer .zhname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .officer .zh .cls {
   flex: none; margin-left: auto; font-size: 10px; line-height: 16px; padding: 0 6px;
   border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent);

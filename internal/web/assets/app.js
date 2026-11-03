@@ -78,6 +78,17 @@
     no_channel: ['warn', '无通道'], legacy: ['', '历史'], pending: ['warn', '待发送'],
   };
 
+  // 舰船图：走自家代理（带缓存），取不到就隐藏，保留文字信息
+  function shipImg(typeId, size, kind = 'render', cls = '') {
+    if (!typeId) return '';
+    // render 拿不到就退回 icon，再失败才隐藏（保留文字信息）
+    const onerr = kind === 'render'
+      ? "this.dataset.f='1';this.src=this.src.replace('kind=render','kind=icon')"
+      : "this.style.visibility='hidden'";
+    return `<img class="${cls}" src="${BASE}api/ship/${typeId}?size=${size}&kind=${kind}"
+      alt="" loading="lazy" onerror="${onerr.replace(/"/g, '&quot;')}">`;
+  }
+
   function chip(tone, text) {
     return `<span class="chip ${tone || ''}">${esc(text)}</span>`;
   }
@@ -173,9 +184,9 @@
     const rows = (d.recent || []).map((k) => `
       <tr class="clickable" data-kill="${k.killmailId}">
         <td class="time">${esc(fmtTime(k.killmailTime))}</td>
-        <td class="strong">${esc(k.officerName)}<span class="sub">${esc([k.officerZh, k.faction].filter(Boolean).join(' · '))}</span></td>
+        <td><span class="shipCell">${shipImg(k.officerTypeId, 32, 'render', 'shipIcon')}<span class="strong">${esc(k.officerName)}<span class="sub">${esc([k.officerZh, k.faction].filter(Boolean).join(' · '))}</span></span></span></td>
         <td>${chip('', ROLE_LABEL[k.role] || k.role)}</td>
-        <td>${esc(k.victimShipName || ('type ' + k.victimShipTypeId))}<span class="sub">${esc(k.victimName || '')}</span></td>
+        <td><span class="shipCell">${shipImg(k.victimShipTypeId, 32, 'render', 'shipIcon')}<span>${esc(k.victimShipName || ('type ' + k.victimShipTypeId))}<span class="sub">${esc(k.victimName || '')}</span></span></span></td>
         <td>${esc(k.systemName || '—')}<span class="sub" title="${esc(k.locationName || k.regionName || '')}">${esc(k.locationName || k.regionName || '')}</span></td>
         <td class="num mono">${fmtISK(k.totalValue)}</td>
         <td>${statusChip(k)}</td>
@@ -244,9 +255,9 @@
     const rows = state.kills.items.map((k) => `
       <tr class="clickable" data-kill="${k.killmailId}">
         <td class="time">${esc(fmtTime(k.killmailTime))}</td>
-        <td class="strong">${esc(k.officerName)}<span class="sub">${esc(k.faction)}</span></td>
+        <td><span class="shipCell">${shipImg(k.officerTypeId, 32, 'render', 'shipIcon')}<span class="strong">${esc(k.officerName)}<span class="sub">${esc([k.officerZh, k.faction].filter(Boolean).join(' · '))}</span></span></span></td>
         <td>${chip('', ROLE_LABEL[k.role] || k.role)}</td>
-        <td>${esc(k.victimName || (k.victimCharId ? String(k.victimCharId) : '—'))}<span class="sub">${esc(k.victimShipName || '')}</span></td>
+        <td>${esc(k.victimName || (k.victimCharId ? String(k.victimCharId) : '—'))}<span class="sub"><span class="shipCell">${shipImg(k.victimShipTypeId, 24, 'render', 'shipIcon')}<span>${esc(k.victimShipName || '')}</span></span></span></td>
         <td>${esc(k.systemName || '—')}<span class="sub" title="${esc(k.locationName || k.regionName || '')}">${esc(k.locationName || k.regionName || '')}</span></td>
         <td class="num mono strong">${fmtISK(k.totalValue)}</td>
         <td>${statusChip(k)}</td>
@@ -324,9 +335,10 @@
         <div class="officer-grid">
           ${items.map(o => `
             <div class="officer ${o.enabled ? '' : 'off'}">
+              ${shipImg(o.typeId, 64, 'render', 'thumb')}
               <div class="info">
                 <div class="name">${esc(o.name)}</div>
-                <div class="zh">${esc(o.zh || '—')}${o.shipClassZh ? `<span class="cls">${esc(o.shipClassZh)}</span>` : ''}</div>
+                <div class="zh"><span class="zhname">${esc(o.zh || '—')}</span>${o.shipClassZh ? `<span class="cls">${esc(o.shipClassZh)}</span>` : ''}</div>
                 <div class="meta" title="${esc([o.groupName, o.lastSeen ? '最近 ' + fmtTime(o.lastSeen) : ''].filter(Boolean).join(' · '))}">船型 ${o.typeId}${o.characterId ? ` · 官员 #${o.characterId}` : ''}</div>
                 <div class="meta" title="${esc([o.groupName, o.lastSeen ? '最近 ' + fmtTime(o.lastSeen) : ''].filter(Boolean).join(' · '))}">${o.killCount
                   ? `${fmtInt(o.killCount)} 次 · 最高 ${fmtISK(o.maxValue)}`
@@ -618,6 +630,7 @@
     const k = d.kill;
     $('#drawerTitle').textContent = k.officerName + ' · ' + fmtISK(k.totalValue) + ' ISK';
     $('#drawerBody').innerHTML = `
+      ${shipImg(k.victimShipTypeId, 128, 'render', 'shipBig')}
       <dl class="kv">
         <dt>KillID</dt><dd class="mono">${k.killmailId}</dd>
         <dt>官员</dt><dd>${esc(k.officerName)}${k.officerZh ? ' · ' + esc(k.officerZh) : ''}
