@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"officerwatch/internal/catalog"
 	"officerwatch/internal/store"
 )
 
@@ -178,11 +179,7 @@ func FormatText(k store.Kill, home string) string {
 	if k.Role == "officer_down" {
 		emoji = "🎯"
 	}
-	b.WriteString(emoji + " " + roleLabel(k) + " · " + k.OfficerName)
-	if k.Faction != "" {
-		b.WriteString("（" + k.Faction + "）")
-	}
-	b.WriteString("\n\n")
+	b.WriteString(emoji + " " + roleLabel(k) + " · " + officerLine(k) + "\n\n")
 
 	if v := victimLine(k); v != "" {
 		b.WriteString("受害者：" + v + "\n")
@@ -214,6 +211,25 @@ func FormatText(k store.Kill, home string) string {
 	b.WriteString("\nhttps://zkillboard.com/kill/" + fmt.Sprint(k.KillmailID) + "/\n")
 	b.WriteString("（链接打不开可以忽略，上面的信息已经够了）")
 	return b.String()
+}
+
+// officerLine 官员一行：英文名 · 中文译名（阵营 · 吨位）。
+func officerLine(k store.Kill) string {
+	s := k.OfficerName
+	if k.OfficerZh != "" && k.OfficerZh != k.OfficerName {
+		s += "（" + k.OfficerZh + "）"
+	}
+	tags := []string{}
+	if zh := catalog.FactionZh(k.Faction); zh != "" {
+		tags = append(tags, zh)
+	}
+	if zh := catalog.ClassZh(k.OfficerClass); zh != "" {
+		tags = append(tags, zh)
+	}
+	if len(tags) > 0 {
+		s += " · " + strings.Join(tags, " · ")
+	}
+	return s
 }
 
 // victimLine 受害者身份：名字 / 公司 · 联盟。
@@ -252,6 +268,18 @@ func valueBreakdown(k store.Kill) string {
 		parts = append(parts, "损毁 "+FormatISK(k.DestroyedValue))
 	}
 	return strings.Join(parts, " / ")
+}
+
+// tagLine 阵营 · 吨位（中文）。
+func tagLine(k store.Kill) string {
+	tags := []string{}
+	if zh := catalog.FactionZh(k.Faction); zh != "" {
+		tags = append(tags, zh)
+	}
+	if zh := catalog.ClassZh(k.OfficerClass); zh != "" {
+		tags = append(tags, zh)
+	}
+	return strings.Join(tags, " · ")
 }
 
 // distance "抢官员"的核心数字：从家门口到死亡点几跳。
@@ -327,7 +355,8 @@ func FormatHTML(k store.Kill, home string) string {
     <div style="padding:16px 20px;border-bottom:1px solid ` + line + `">
       <div style="color:` + dim + `;font-size:12px;letter-spacing:.06em;text-transform:uppercase">` + emoji + ` ` + roleLabel(k) + `</div>
       <div style="font-size:20px;font-weight:650;color:#161a22;margin-top:4px">` + esc(k.OfficerName) + `</div>
-      <div style="color:` + dim + `;font-size:13px;margin-top:2px">` + esc(k.Faction) + `</div>
+      <div style="color:#161a22;font-size:14px;margin-top:2px">` + esc(k.OfficerZh) + `</div>
+      <div style="color:` + dim + `;font-size:13px;margin-top:2px">` + esc(tagLine(k)) + `</div>
     </div>
     <div style="padding:6px 20px 18px">
       <table style="width:100%;border-collapse:collapse">

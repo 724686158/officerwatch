@@ -92,10 +92,15 @@ type Match struct {
 // Officer 官员名录条目。名录来自 ESI 的 Entity 分类里名字含 "Officer" 的船组，
 // 是权威数据（和游戏客户端同源），不需要手工维护 ID 表。
 type Officer struct {
-	TypeID       int64  `json:"typeId"`
-	Name         string `json:"name"`
-	Faction      string `json:"faction"`
-	GroupID      int64  `json:"groupId"`
+	TypeID      int64  `json:"typeId"`
+	Name        string `json:"name"`
+	Zh          string `json:"zh"`          // 中文译名（音译，非官方）
+	Faction     string `json:"faction"`
+	FactionZh   string `json:"factionZh"`   // 天蛇 / 血袭者 …
+	ShipClass   string `json:"shipClass"`   // battleship / cruiser / frigate
+	ShipClassZh string `json:"shipClassZh"` // 战列 / 巡洋 / 护卫
+	CharacterID int64  `json:"characterId"` // NPC 角色 ID（killmail 里没有，仅展示）
+	GroupID     int64  `json:"groupId"`
 	GroupName    string `json:"groupName"`
 	Enabled      bool   `json:"enabled"`
 	Source       string `json:"source"` // seed / esi

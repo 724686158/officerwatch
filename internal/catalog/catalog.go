@@ -50,6 +50,19 @@ func Faction(groupName string) string {
 	return strings.TrimSpace(s)
 }
 
+// withMeta 把人工维护的元数据（中文译名 / 吨位 / NPC 角色 ID）贴到 ESI 来的记录上。
+// 查不到就留空——新官员会在图鉴里显示英文名，不会阻塞同步。
+func withMeta(o model.Officer) model.Officer {
+	if m, ok := MetaFor(o.TypeID); ok {
+		o.Zh = m.Zh
+		o.ShipClass = m.Class
+		o.CharacterID = m.CharacterID
+	}
+	o.FactionZh = FactionZh(o.Faction)
+	o.ShipClassZh = ClassZh(o.ShipClass)
+	return o
+}
+
 // Syncer 负责把 ESI 的名字同步进 officers 表。
 type Syncer struct {
 	esi *esi.Client
@@ -81,7 +94,7 @@ func (s *Syncer) Sync(ctx context.Context) (int, error) {
 			}
 			seen[tid] = true
 			name := s.res.TypeName(ctx, tid)
-			out = append(out, model.Officer{
+			out = append(out, withMeta(model.Officer{
 				TypeID:    tid,
 				Name:      name,
 				GroupID:   gid,
@@ -89,7 +102,7 @@ func (s *Syncer) Sync(ctx context.Context) (int, error) {
 				Faction:   faction,
 				Enabled:   DefaultEnabled[tid],
 				Source:    "esi",
-			})
+			}))
 		}
 	}
 	if len(out) == 0 {
@@ -145,7 +158,7 @@ func (s *Syncer) DeepScan(ctx context.Context) (int, error) {
 	for _, g := range discovered {
 		faction := Faction(g.name)
 		for _, tid := range g.typ {
-			out = append(out, model.Officer{
+			out = append(out, withMeta(model.Officer{
 				TypeID:    tid,
 				Name:      s.res.TypeName(ctx, tid),
 				GroupID:   g.id,
@@ -153,7 +166,7 @@ func (s *Syncer) DeepScan(ctx context.Context) (int, error) {
 				Faction:   faction,
 				Enabled:   DefaultEnabled[tid],
 				Source:    "esi-deep",
-			})
+			}))
 		}
 	}
 	if len(out) == 0 {

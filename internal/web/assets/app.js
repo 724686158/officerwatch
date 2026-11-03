@@ -72,6 +72,7 @@
   }
 
   const ROLE_LABEL = { npc_kill: '官员击杀', officer_down: '官员被爆' };
+  const CLASS_ZH = { battleship: '战列', cruiser: '巡洋', frigate: '护卫' };
   const STATUS_TONE = {
     sent: ['good', '已推送'], filtered: ['', '已过滤'], failed: ['bad', '失败'],
     no_channel: ['warn', '无通道'], legacy: ['', '历史'], pending: ['warn', '待发送'],
@@ -172,7 +173,7 @@
     const rows = (d.recent || []).map((k) => `
       <tr class="clickable" data-kill="${k.killmailId}">
         <td class="time">${esc(fmtTime(k.killmailTime))}</td>
-        <td class="strong">${esc(k.officerName)}<span class="sub">${esc(k.faction)}</span></td>
+        <td class="strong">${esc(k.officerName)}<span class="sub">${esc([k.officerZh, k.faction].filter(Boolean).join(' · '))}</span></td>
         <td>${chip('', ROLE_LABEL[k.role] || k.role)}</td>
         <td>${esc(k.victimShipName || ('type ' + k.victimShipTypeId))}<span class="sub">${esc(k.victimName || '')}</span></td>
         <td>${esc(k.systemName || '—')}<span class="sub" title="${esc(k.locationName || k.regionName || '')}">${esc(k.locationName || k.regionName || '')}</span></td>
@@ -314,8 +315,9 @@
 
     const groups = Object.keys(byFaction).sort().map((faction) => {
       const items = byFaction[faction].sort((a, b) => b.killCount - a.killCount || a.name.localeCompare(b.name));
+      const factionZh = (byFaction[faction][0] || {}).factionZh || '';
       return `<div class="faction-head">
-          <h3>${esc(faction)}</h3>
+          <h3>${esc(faction)}${factionZh ? ` <span class="zh">${esc(factionZh)}</span>` : ''}</h3>
           ${chip('accent', items.length + ' 位')}
           <span class="line"></span>
         </div>
@@ -324,7 +326,11 @@
             <div class="officer ${o.enabled ? '' : 'off'}">
               <div class="info">
                 <div class="name">${esc(o.name)}</div>
-                <div class="meta" title="${esc([o.groupName, o.lastSeen ? '最近 ' + fmtTime(o.lastSeen) : '还没观测到'].join(' · '))}">type ${o.typeId}${o.killCount ? ` · ${fmtInt(o.killCount)} 次 · 最高 ${fmtISK(o.maxValue)}` : ' · 未观测到'}</div>
+                <div class="zh">${esc(o.zh || '—')}${o.shipClassZh ? `<span class="cls">${esc(o.shipClassZh)}</span>` : ''}</div>
+                <div class="meta" title="${esc([o.groupName, o.lastSeen ? '最近 ' + fmtTime(o.lastSeen) : ''].filter(Boolean).join(' · '))}">船型 ${o.typeId}${o.characterId ? ` · 官员 #${o.characterId}` : ''}</div>
+                <div class="meta" title="${esc([o.groupName, o.lastSeen ? '最近 ' + fmtTime(o.lastSeen) : ''].filter(Boolean).join(' · '))}">${o.killCount
+                  ? `${fmtInt(o.killCount)} 次 · 最高 ${fmtISK(o.maxValue)}`
+                  : (o.enabled ? '已监控，还没观测到' : '未开启监控')}</div>
               </div>
               <label class="switch" title="${o.enabled ? '已开启监控' : '已关闭'}">
                 <input type="checkbox" ${o.enabled ? 'checked' : ''} data-action="toggleOfficer" data-id="${o.typeId}">
@@ -614,7 +620,9 @@
     $('#drawerBody').innerHTML = `
       <dl class="kv">
         <dt>KillID</dt><dd class="mono">${k.killmailId}</dd>
-        <dt>官员</dt><dd>${esc(k.officerName)} ${chip('accent', k.faction || '—')}</dd>
+        <dt>官员</dt><dd>${esc(k.officerName)}${k.officerZh ? ' · ' + esc(k.officerZh) : ''}
+          ${chip('accent', k.faction || '—')}${chip('', CLASS_ZH[k.officerClass] || '')}
+          <span style="color:var(--faint);font-size:12px">船型 ${k.officerTypeId}</span></dd>
         <dt>类型</dt><dd>${esc(ROLE_LABEL[k.role] || k.role)}</dd>
         <dt>时间</dt><dd>${esc(fmtTime(k.killmailTime))}</dd>
         <dt>地点</dt><dd>${esc(k.systemName || '—')}${k.regionName ? ' · ' + esc(k.regionName) : ''}${k.systemSec ? ` · 安全 ${k.systemSec.toFixed(2)}` : ''}${k.jumps ? ` · <b>距家 ${k.jumps} 跳</b>` : ''}</dd>

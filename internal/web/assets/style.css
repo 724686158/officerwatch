@@ -255,6 +255,13 @@ label.field { display: inline-flex; align-items: center; gap: 8px; color: var(--
 .officer .info { flex: 1; min-width: 0; }
 .officer .name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .officer .meta { color: var(--faint); font-size: var(--fs-xs); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 中文译名一行：译名 + 吨位标签 */
+.officer .zh { display: flex; align-items: center; gap: 6px; margin-top: 1px; color: var(--dim); font-size: var(--fs-sm); }
+.officer .zh .cls {
+  flex: none; margin-left: auto; font-size: 10px; line-height: 16px; padding: 0 6px;
+  border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent);
+}
+.faction-head .zh { color: var(--faint); font-size: var(--fs-sm); }
 
 /* ────────────────────────── 设置 */
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }

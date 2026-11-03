@@ -7,6 +7,8 @@
 
 ![击杀记录](docs/screenshots/kills.png)
 
+![官员图鉴](docs/screenshots/officers.png)
+
 这是老项目 **EVE-RedisQ**（2025-11 ~ 2026-02，Windows 单 exe、1700 行 `gui_http.go` 内嵌 HTML）
 的现代化重写：同样的产品判断，重做的工程结构。作者自托管实例挂在某个子路径下（`/officerwatch/`），
 你也可以直接 `go build` 跑在自己机器上。
@@ -60,8 +62,22 @@ EVE 里的"官员"（Officer）是极稀有的 NPC 怪，打死它会掉官员�
 `Asteroid Serpentis Officer` 恰好 4 条船：Cormack Vaaja / Tuvan Orth / Brynn Jerdola / Setele Schellan。
 与客户端同源，CCP 加新官员时同步一遍就能跟上。
 
-当前快照：**16 个船组 / 34 位官员 / 7 个阵营**（Angel Cartel、Blood Raiders、Guristas、
-Rogue Drone、Sansha's Nation、Serpentis + 各阵营新加的官员巡洋/护卫）。
+当前快照：**16 个船组 / 34 位官员 / 6 个阵营**（Angel Cartel 天使、Blood Raiders 血袭者、
+Guristas 古斯塔斯、Rogue Drone 流浪无人机、Sansha's Nation 萨沙、Serpentis 天蛇）。
+
+每个阵营的结构基本一致：**4 条战列级 + 1 条巡洋级 + 1 条护卫级**（Rogue Drone 只有 4 条战列级，
+Guristas 的 Estamel Tharchon 按船体质量算护卫级）。
+
+**两套 ID 别混**：
+
+| | 例子 | 用在哪 |
+|---|---|---|
+| 船型 ID（typeID） | `13654` | killmail 里 NPC 攻击者只有这个；匹配、开关、入库都以它为准 |
+| NPC 角色 ID | `3010230` | 官员"本人"，只用于展示与查资料；killmail 里没有这个字段 |
+
+中文译名（`科马克·瓦亚`）、吨位、角色 ID 存在 `internal/catalog/data/officers.json`，
+由 `tools/build-officer-meta.py` 生成、`tools/verify-officer-meta.py` 校验与 ESI 的一致性。
+**译名是音译，不是 CCP 官方译法**——官方中文客户端没有公开这层对照表。
 
 - 常规同步：只拉已知 16 个船组（约 50 次 ESI 请求，几十秒），启动时 + 每 24 小时；
 - 深度重扫：扫完 Entity 分类下 415 个组找新船组（页面「图鉴 → 深度重扫」）；
@@ -74,7 +90,8 @@ Rogue Drone、Sansha's Nation、Serpentis + 各阵营新加的官员巡洋/护�
 
 - **概览**：今日/7 天/累计、今日损失、单笔最大、14 天柱图、阵营分布、最近入库
 - **击杀**：按阵营/角色/最低价值/关键字筛选，按时间或价值排序，分页，点开看详情（含原始 JSON）
-- **图鉴**：34 位官员按阵营分组，一键开关，显示观测次数/最高价值/最近一次
+- **图鉴**：34 位官员按阵营分组，一键开关。每位标出**中文译名、吨位（战列/巡洋/护卫）、
+  船型 ID、NPC 角色 ID**，以及观测次数/最高价值/最近一次
 - **统计**：30 天曲线、击杀最多的官员 Top 10、阵营累计
 - **设置**：口径（角色、价值阈值、阵营白名单）、静默时段、每小时限流、通知总开关、回填小时数、
   家星系（算跳数）、**收件人管理**（加/删，立即生效）
@@ -254,5 +271,7 @@ internal/web           JSON API + go:embed 内嵌前端
 internal/web/assets    纯静态前端（无构建步骤）
 deploy                 systemd unit（模板）、Nginx 片段（模板）、发布脚本
 tools/build-celestials.sh  重建星体名索引
+tools/build-officer-meta.py  重建官员元数据（中文名/吨位/角色 ID）
+tools/verify-officer-meta.py 校验官员元数据与 ESI 的一致性
 docs/HISTORY.md        从 EVE-RedisQ 到这里的改造记录
 ```

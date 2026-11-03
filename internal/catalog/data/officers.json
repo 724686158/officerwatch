@@ -1,0 +1,392 @@
+{
+ "_说明": "官员元数据：中文译名（音译）、吨位、NPC 角色 ID。船型与阵营来自 ESI，由 -sync-catalog 同步；本文件按 typeId 合并，只补人工信息。重新生成：python3 tools/build-officer-meta.py",
+ "factions": {
+  "Angel Cartel": "天使",
+  "Blood Raiders": "血袭者",
+  "Guristas": "古斯塔斯",
+  "Rogue Drone": "流浪无人机",
+  "Sansha's Nation": "萨沙",
+  "Serpentis": "天蛇"
+ },
+ "classes": {
+  "battleship": "战列",
+  "cruiser": "巡洋",
+  "frigate": "护卫"
+ },
+ "officers": [
+  {
+   "typeId": 13536,
+   "name": "Mizuro Cybon",
+   "zh": "米祖罗·赛邦",
+   "faction": "Angel Cartel",
+   "factionZh": "天使",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010287,
+   "group": "Asteroid Angel Cartel Officer"
+  },
+  {
+   "typeId": 13538,
+   "name": "Hakim Stormare",
+   "zh": "哈基姆·斯托马雷",
+   "faction": "Angel Cartel",
+   "factionZh": "天使",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3013997,
+   "group": "Asteroid Angel Cartel Officer"
+  },
+  {
+   "typeId": 13541,
+   "name": "Gotan Kreiss",
+   "zh": "戈坦·克赖斯",
+   "faction": "Angel Cartel",
+   "factionZh": "天使",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010283,
+   "group": "Asteroid Angel Cartel Officer"
+  },
+  {
+   "typeId": 13544,
+   "name": "Tobias Kruzhor",
+   "zh": "托比亚斯·克鲁佐尔",
+   "faction": "Angel Cartel",
+   "factionZh": "天使",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010282,
+   "group": "Asteroid Angel Cartel Officer"
+  },
+  {
+   "typeId": 84950,
+   "name": "Sila Aajai",
+   "zh": "西拉·阿贾伊",
+   "faction": "Angel Cartel",
+   "factionZh": "天使",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3018027,
+   "group": "Asteroid Angel Cartel Officer Cruiser"
+  },
+  {
+   "typeId": 84926,
+   "name": "Ramaku Basta",
+   "zh": "拉马库·巴斯塔",
+   "faction": "Angel Cartel",
+   "factionZh": "天使",
+   "class": "frigate",
+   "classZh": "护卫",
+   "characterId": 3017874,
+   "group": "Asteroid Angel Cartel Officer Frigate"
+  },
+  {
+   "typeId": 13557,
+   "name": "Raysere Giant",
+   "zh": "雷塞尔·吉安特",
+   "faction": "Blood Raiders",
+   "factionZh": "血袭者",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3015818,
+   "group": "Asteroid Blood Raiders Officer"
+  },
+  {
+   "typeId": 13561,
+   "name": "Ahremen Arkah",
+   "zh": "阿赫雷门·阿尔卡",
+   "faction": "Blood Raiders",
+   "factionZh": "血袭者",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010195,
+   "group": "Asteroid Blood Raiders Officer"
+  },
+  {
+   "typeId": 13564,
+   "name": "Draclira Merlonne",
+   "zh": "德拉克利拉·梅隆",
+   "faction": "Blood Raiders",
+   "factionZh": "血袭者",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3015822,
+   "group": "Asteroid Blood Raiders Officer"
+  },
+  {
+   "typeId": 13573,
+   "name": "Tairei Namazoth",
+   "zh": "泰雷·纳马佐斯",
+   "faction": "Blood Raiders",
+   "factionZh": "血袭者",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3015823,
+   "group": "Asteroid Blood Raiders Officer"
+  },
+  {
+   "typeId": 84952,
+   "name": "Ryhad Sethrim",
+   "zh": "里哈德·塞斯里姆",
+   "faction": "Blood Raiders",
+   "factionZh": "血袭者",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3018472,
+   "group": "Asteroid Blood Raiders Officer Cruiser"
+  },
+  {
+   "typeId": 84945,
+   "name": "Makra Ozman",
+   "zh": "马克拉·奥兹曼",
+   "faction": "Blood Raiders",
+   "factionZh": "血袭者",
+   "class": "frigate",
+   "classZh": "护卫",
+   "characterId": 3018461,
+   "group": "Asteroid Blood Raiders Officer Frigate"
+  },
+  {
+   "typeId": 13580,
+   "name": "Vepas Minimala",
+   "zh": "维帕斯·米尼马拉",
+   "faction": "Guristas",
+   "factionZh": "古斯塔斯",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010127,
+   "group": "Asteroid Guristas Officer"
+  },
+  {
+   "typeId": 13584,
+   "name": "Thon Eney",
+   "zh": "托恩·埃尼",
+   "faction": "Guristas",
+   "factionZh": "古斯塔斯",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3013966,
+   "group": "Asteroid Guristas Officer"
+  },
+  {
+   "typeId": 13589,
+   "name": "Kaikka Peunato",
+   "zh": "凯卡·佩纳托",
+   "faction": "Guristas",
+   "factionZh": "古斯塔斯",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010123,
+   "group": "Asteroid Guristas Officer"
+  },
+  {
+   "typeId": 84953,
+   "name": "Hanaruwa Oittenen",
+   "zh": "哈纳鲁瓦·奥伊特宁",
+   "faction": "Guristas",
+   "factionZh": "古斯塔斯",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3018016,
+   "group": "Asteroid Guristas Officer Cruiser"
+  },
+  {
+   "typeId": 13603,
+   "name": "Estamel Tharchon",
+   "zh": "埃斯塔梅尔·萨松",
+   "faction": "Guristas",
+   "factionZh": "古斯塔斯",
+   "class": "frigate",
+   "classZh": "护卫",
+   "characterId": 3015759,
+   "group": "Asteroid Guristas Officer"
+  },
+  {
+   "typeId": 84946,
+   "name": "Panola Paatama",
+   "zh": "帕诺拉·帕塔马",
+   "faction": "Guristas",
+   "factionZh": "古斯塔斯",
+   "class": "frigate",
+   "classZh": "护卫",
+   "characterId": 3018272,
+   "group": "Asteroid Guristas Officer Frigate"
+  },
+  {
+   "typeId": 32959,
+   "name": "Unit D-34343",
+   "zh": "单元 D-34343",
+   "faction": "Rogue Drone",
+   "factionZh": "流浪无人机",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 0,
+   "group": "Asteroid Rogue Drone Officer"
+  },
+  {
+   "typeId": 32960,
+   "name": "Unit F-435454",
+   "zh": "单元 F-435454",
+   "faction": "Rogue Drone",
+   "factionZh": "流浪无人机",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 0,
+   "group": "Asteroid Rogue Drone Officer"
+  },
+  {
+   "typeId": 32961,
+   "name": "Unit P-343554",
+   "zh": "单元 P-343554",
+   "faction": "Rogue Drone",
+   "factionZh": "流浪无人机",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 0,
+   "group": "Asteroid Rogue Drone Officer"
+  },
+  {
+   "typeId": 32962,
+   "name": "Unit W-634",
+   "zh": "单元 W-634",
+   "faction": "Rogue Drone",
+   "factionZh": "流浪无人机",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 0,
+   "group": "Asteroid Rogue Drone Officer"
+  },
+  {
+   "typeId": 13609,
+   "name": "Brokara Ryver",
+   "zh": "布罗卡拉·里弗",
+   "faction": "Sansha's Nation",
+   "factionZh": "萨沙",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3010689,
+   "group": "Asteroid Sansha's Nation Officer"
+  },
+  {
+   "typeId": 13615,
+   "name": "Selynne Mardakar",
+   "zh": "塞琳·马尔达卡",
+   "faction": "Sansha's Nation",
+   "factionZh": "萨沙",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3010696,
+   "group": "Asteroid Sansha's Nation Officer"
+  },
+  {
+   "typeId": 13622,
+   "name": "Vizan Ankonin",
+   "zh": "维赞·安科宁",
+   "faction": "Sansha's Nation",
+   "factionZh": "萨沙",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3004509,
+   "group": "Asteroid Sansha's Nation Officer"
+  },
+  {
+   "typeId": 13635,
+   "name": "Chelm Soran",
+   "zh": "凯尔姆·索兰",
+   "faction": "Sansha's Nation",
+   "factionZh": "萨沙",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3010693,
+   "group": "Asteroid Sansha's Nation Officer"
+  },
+  {
+   "typeId": 84954,
+   "name": "Nija Zufa",
+   "zh": "尼贾·祖法",
+   "faction": "Sansha's Nation",
+   "factionZh": "萨沙",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3018139,
+   "group": "Asteroid Sansha's Nation Officer Cruiser"
+  },
+  {
+   "typeId": 84947,
+   "name": "Usaras Koirola",
+   "zh": "乌萨拉斯·科伊罗拉",
+   "faction": "Sansha's Nation",
+   "factionZh": "萨沙",
+   "class": "frigate",
+   "classZh": "护卫",
+   "characterId": 3017918,
+   "group": "Asteroid Sansha's Nation Officer Frigate"
+  },
+  {
+   "typeId": 13654,
+   "name": "Cormack Vaaja",
+   "zh": "科马克·瓦亚",
+   "faction": "Serpentis",
+   "factionZh": "天蛇",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010230,
+   "group": "Asteroid Serpentis Officer"
+  },
+  {
+   "typeId": 13659,
+   "name": "Tuvan Orth",
+   "zh": "图万·奥尔思",
+   "faction": "Serpentis",
+   "factionZh": "天蛇",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3015833,
+   "group": "Asteroid Serpentis Officer"
+  },
+  {
+   "typeId": 13661,
+   "name": "Brynn Jerdola",
+   "zh": "布琳·杰尔多拉",
+   "faction": "Serpentis",
+   "factionZh": "天蛇",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010223,
+   "group": "Asteroid Serpentis Officer"
+  },
+  {
+   "typeId": 13667,
+   "name": "Setele Schellan",
+   "zh": "塞泰勒·谢兰",
+   "faction": "Serpentis",
+   "factionZh": "天蛇",
+   "class": "battleship",
+   "classZh": "战列",
+   "characterId": 3010233,
+   "group": "Asteroid Serpentis Officer"
+  },
+  {
+   "typeId": 84951,
+   "name": "Gara Minsk",
+   "zh": "加拉·明斯克",
+   "faction": "Serpentis",
+   "factionZh": "天蛇",
+   "class": "cruiser",
+   "classZh": "巡洋",
+   "characterId": 3017705,
+   "group": "Asteroid Serpentis Officer Cruiser"
+  },
+  {
+   "typeId": 84948,
+   "name": "Asine Hitama",
+   "zh": "阿辛·希塔玛",
+   "faction": "Serpentis",
+   "factionZh": "天蛇",
+   "class": "frigate",
+   "classZh": "护卫",
+   "characterId": 3010219,
+   "group": "Asteroid Serpentis Officer Frigate"
+  }
+ ]
+}

@@ -158,6 +158,9 @@ func (s *Store) migrate() error {
 		{"kills", "location_id", "INTEGER NOT NULL DEFAULT 0"},
 		{"kills", "location_name", "TEXT NOT NULL DEFAULT ''"},
 		{"kills", "jumps", "INTEGER NOT NULL DEFAULT 0"},
+		{"officers", "zh_name", "TEXT NOT NULL DEFAULT ''"},
+		{"officers", "ship_class", "TEXT NOT NULL DEFAULT ''"},
+		{"officers", "character_id", "INTEGER NOT NULL DEFAULT 0"},
 	}
 	for _, a := range alters {
 		q := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", a[0], a[1], a[2])
@@ -213,8 +216,11 @@ func (s *Store) UpsertOfficers(list []model.Officer) (added int, err error) {
 			return added, err
 		}
 		if exists > 0 {
-			_, err = tx.Exec(`UPDATE officers SET name = ?, group_id = ?, group_name = ?, faction = ?
-				WHERE type_id = ?`, o.Name, o.GroupID, o.GroupName, o.Faction, o.TypeID)
+			// 名字/归属会变（CCP 加新船、改名），中文名与吨位跟着元数据走，每次同步都覆盖
+			_, err = tx.Exec(`UPDATE officers SET name = ?, group_id = ?, group_name = ?, faction = ?,
+				zh_name = ?, ship_class = ?, character_id = ?
+				WHERE type_id = ?`, o.Name, o.GroupID, o.GroupName, o.Faction,
+				o.Zh, o.ShipClass, o.CharacterID, o.TypeID)
 		} else {
 			en := 0
 			if o.Enabled {
@@ -224,8 +230,10 @@ func (s *Store) UpsertOfficers(list []model.Officer) (added int, err error) {
 			if src == "" {
 				src = "esi"
 			}
-			_, err = tx.Exec(`INSERT INTO officers(type_id, name, group_id, group_name, faction, enabled, source, discovered_at)
-				VALUES(?, ?, ?, ?, ?, ?, ?, ?)`, o.TypeID, o.Name, o.GroupID, o.GroupName, o.Faction, en, src, now)
+			_, err = tx.Exec(`INSERT INTO officers(type_id, name, group_id, group_name, faction, enabled, source,
+				discovered_at, zh_name, ship_class, character_id)
+				VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, o.TypeID, o.Name, o.GroupID, o.GroupName, o.Faction,
+				en, src, now, o.Zh, o.ShipClass, o.CharacterID)
 			added++
 		}
 		if err != nil {
@@ -238,7 +246,8 @@ func (s *Store) UpsertOfficers(list []model.Officer) (added int, err error) {
 // ListOfficers 返回名录 + 每个官员的实战统计（左连接 kills）。
 func (s *Store) ListOfficers() ([]model.Officer, error) {
 	rows, err := s.db.Query(`
-		SELECT o.type_id, o.name, o.group_id, o.group_name, o.faction, o.enabled, o.source, o.discovered_at,
+		SELECT o.type_id, o.name, o.zh_name, o.ship_class, o.character_id,
+		       o.group_id, o.group_name, o.faction, o.enabled, o.source, o.discovered_at,
 		       COUNT(k.killmail_id) AS cnt,
 		       COALESCE(SUM(k.total_value), 0) AS total,
 		       COALESCE(MAX(k.total_value), 0) AS maxv,
@@ -256,7 +265,8 @@ func (s *Store) ListOfficers() ([]model.Officer, error) {
 	for rows.Next() {
 		var o model.Officer
 		var en int
-		if err := rows.Scan(&o.TypeID, &o.Name, &o.GroupID, &o.GroupName, &o.Faction, &en, &o.Source,
+		if err := rows.Scan(&o.TypeID, &o.Name, &o.Zh, &o.ShipClass, &o.CharacterID,
+			&o.GroupID, &o.GroupName, &o.Faction, &en, &o.Source,
 			&o.DiscoveredAt, &o.KillCount, &o.TotalValue, &o.MaxValue, &o.LastSeen); err != nil {
 			return nil, err
 		}
@@ -270,9 +280,11 @@ func (s *Store) ListOfficers() ([]model.Officer, error) {
 func (s *Store) OfficerByType(typeID int64) (model.Officer, bool, error) {
 	var o model.Officer
 	var en int
-	err := s.db.QueryRow(`SELECT type_id, name, group_id, group_name, faction, enabled, source, discovered_at
+	err := s.db.QueryRow(`SELECT type_id, name, zh_name, ship_class, character_id,
+		group_id, group_name, faction, enabled, source, discovered_at
 		FROM officers WHERE type_id = ?`, typeID).
-		Scan(&o.TypeID, &o.Name, &o.GroupID, &o.GroupName, &o.Faction, &en, &o.Source, &o.DiscoveredAt)
+		Scan(&o.TypeID, &o.Name, &o.Zh, &o.ShipClass, &o.CharacterID,
+			&o.GroupID, &o.GroupName, &o.Faction, &en, &o.Source, &o.DiscoveredAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return o, false, nil
 	}
@@ -328,6 +340,8 @@ type Kill struct {
 	KillmailID         int64     `json:"killmailId"`
 	OfficerTypeID      int64     `json:"officerTypeId"`
 	OfficerName        string    `json:"officerName"`
+	OfficerZh          string    `json:"officerZh"`
+	OfficerClass       string    `json:"officerClass"` // battleship / cruiser / frigate
 	Faction            string    `json:"faction"`
 	Role               string    `json:"role"`
 	KillmailTime       time.Time `json:"killmailTime"`
@@ -481,7 +495,8 @@ func (s *Store) ListKills(f KillFilter) ([]Kill, int, error) {
 	if f.SortBy == "value" {
 		order = "k.total_value DESC"
 	}
-	q := `SELECT k.killmail_id, k.officer_type_id, COALESCE(o.name,''), COALESCE(o.faction,''), k.role,
+	q := `SELECT k.killmail_id, k.officer_type_id, COALESCE(o.name,''), COALESCE(o.zh_name,''), COALESCE(o.ship_class,''),
+		COALESCE(o.faction,''), k.role,
 		k.killmail_time, k.total_value, k.fitted_value, k.dropped_value, k.destroyed_value, k.points,
 		k.npc, k.solo, k.awox, k.labels, k.solar_system_id, k.system_name, k.region_id, k.region_name,
 		k.victim_char_id, k.victim_corp_id, k.victim_alliance_id, k.victim_ship_type_id, k.victim_ship_name,
@@ -516,7 +531,7 @@ func scanKill(r scannable) (*Kill, error) {
 	var k Kill
 	var npc, solo, awox int
 	var labels, ts, created string
-	if err := r.Scan(&k.KillmailID, &k.OfficerTypeID, &k.OfficerName, &k.Faction, &k.Role,
+	if err := r.Scan(&k.KillmailID, &k.OfficerTypeID, &k.OfficerName, &k.OfficerZh, &k.OfficerClass, &k.Faction, &k.Role,
 		&ts, &k.TotalValue, &k.FittedValue, &k.DroppedValue, &k.DestroyedValue, &k.Points,
 		&npc, &solo, &awox, &labels, &k.SystemID, &k.SystemName, &k.RegionID, &k.RegionName,
 		&k.VictimCharID, &k.VictimCorpID, &k.VictimAlliance, &k.VictimShipID, &k.VictimShipName,
@@ -538,7 +553,8 @@ func scanKill(r scannable) (*Kill, error) {
 
 // GetKill 取单条（含 raw_json）。
 func (s *Store) GetKill(killmailID int64) (*Kill, string, error) {
-	q := `SELECT k.killmail_id, k.officer_type_id, COALESCE(o.name,''), COALESCE(o.faction,''), k.role,
+	q := `SELECT k.killmail_id, k.officer_type_id, COALESCE(o.name,''), COALESCE(o.zh_name,''), COALESCE(o.ship_class,''),
+		COALESCE(o.faction,''), k.role,
 		k.killmail_time, k.total_value, k.fitted_value, k.dropped_value, k.destroyed_value, k.points,
 		k.npc, k.solo, k.awox, k.labels, k.solar_system_id, k.system_name, k.region_id, k.region_name,
 		k.victim_char_id, k.victim_corp_id, k.victim_alliance_id, k.victim_ship_type_id, k.victim_ship_name,
@@ -552,7 +568,7 @@ func (s *Store) GetKill(killmailID int64) (*Kill, string, error) {
 	var k Kill
 	var npc, solo, awox int
 	var labels, ts, created, raw string
-	err := s.db.QueryRow(q, killmailID).Scan(&k.KillmailID, &k.OfficerTypeID, &k.OfficerName, &k.Faction, &k.Role,
+	err := s.db.QueryRow(q, killmailID).Scan(&k.KillmailID, &k.OfficerTypeID, &k.OfficerName, &k.OfficerZh, &k.OfficerClass, &k.Faction, &k.Role,
 		&ts, &k.TotalValue, &k.FittedValue, &k.DroppedValue, &k.DestroyedValue, &k.Points,
 		&npc, &solo, &awox, &labels, &k.SystemID, &k.SystemName, &k.RegionID, &k.RegionName,
 		&k.VictimCharID, &k.VictimCorpID, &k.VictimAlliance, &k.VictimShipID, &k.VictimShipName,

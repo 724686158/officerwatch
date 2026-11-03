@@ -11,6 +11,7 @@ import (
 func sampleKill() store.Kill {
 	return store.Kill{
 		KillmailID: 132678033, OfficerTypeID: 13654, OfficerName: "Cormack Vaaja",
+		OfficerZh: "科马克·瓦亚", OfficerClass: "battleship",
 		Faction: "Serpentis", Role: "npc_kill",
 		KillmailTime: time.Date(2026, 11, 3, 11, 30, 0, 0, time.UTC),
 		TotalValue:   1.163e9, DroppedValue: 4.2e8, DestroyedValue: 7.4e8,
@@ -33,7 +34,7 @@ func TestFormatISK(t *testing.T) {
 
 func TestFormatText(t *testing.T) {
 	txt := FormatText(sampleKill(), "Jita")
-	for _, want := range []string{"官员击杀", "Cormack Vaaja", "Serpentis", "1.16B", "Jita", "Vexor",
+	for _, want := range []string{"官员击杀", "Cormack Vaaja", "天蛇", "战列", "1.16B", "Jita", "Vexor",
 		"Some Pilot", "Tritanium Ltd", "Brave Collective", "3 名攻击者", "历史最高损失",
 		"安全 0.95", "链接打不开可以忽略", "zkillboard.com/kill/132678033",
 		"星体：9 - Asteroid Belt 3（小行星带）", "距 Jita 12 跳"} {
@@ -53,7 +54,7 @@ func TestFormatText(t *testing.T) {
 
 func TestFormatHTML(t *testing.T) {
 	h := FormatHTML(sampleKill(), "Jita")
-	for _, want := range []string{"Cormack Vaaja", "1.16B ISK", "zkillboard.com/kill/132678033", "Vexor",
+	for _, want := range []string{"Cormack Vaaja", "科马克·瓦亚", "1.16B ISK", "zkillboard.com/kill/132678033", "Vexor",
 		"Some Pilot", "Brave Collective", "掉落", "损毁", "北京时间"} {
 		if !strings.Contains(h, want) {
 			t.Errorf("HTML 缺 %q", want)
@@ -62,10 +63,14 @@ func TestFormatHTML(t *testing.T) {
 	if strings.Contains(h, "<script") {
 		t.Error("HTML 里不该有脚本")
 	}
+	// 阵营/吨位用中文展示（面向中文玩家），英文阵营名不出现
+	if !strings.Contains(h, "天蛇") || !strings.Contains(h, "战列") {
+		t.Error("HTML 里应有中文阵营与吨位")
+	}
 	// 官方船名里带单引号（Sansha's Nation）时不能破坏行内样式
 	k := sampleKill()
 	k.Faction = "Sansha's Nation"
-	if !strings.Contains(FormatHTML(k, "Jita"), "Sansha") {
+	if !strings.Contains(FormatHTML(k, "Jita"), "萨沙") {
 		t.Error("阵营名带引号时被吞了")
 	}
 }

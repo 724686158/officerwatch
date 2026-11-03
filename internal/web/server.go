@@ -312,6 +312,7 @@ func (s *Server) handleOfficers(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
+	decorateOfficers(list)
 	writeJSON(w, 200, map[string]any{
 		"items":    list,
 		"syncedAt": s.st.GetMeta("catalog_synced_at"),
@@ -336,8 +337,20 @@ func (s *Server) handleToggleOfficer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	o, _, _ := s.st.OfficerByType(id)
+	decorateOfficers([]model.Officer{o})
 	s.st.AddEvent("info", "catalog", fmt.Sprintf("官员开关 %s → %v", o.Name, req.Enabled))
 	writeJSON(w, 200, map[string]any{"ok": true, "officer": o})
+}
+
+// decorateOfficers 把"阵营/吨位"的中文名补上。
+//
+// 这些是展示用的派生字段：数据库只存 ship_class（battleship…）和 faction（Serpentis），
+// 中文映射来自 internal/catalog 的元数据。放在 web 层做，是因为 store 不能反向依赖 catalog。
+func decorateOfficers(list []model.Officer) {
+	for i := range list {
+		list[i].FactionZh = catalog.FactionZh(list[i].Faction)
+		list[i].ShipClassZh = catalog.ClassZh(list[i].ShipClass)
+	}
 }
 
 // ─────────────────────────────── 统计
