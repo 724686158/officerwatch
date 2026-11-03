@@ -1,0 +1,38 @@
+[Unit]
+# 这是一个模板：__APP_DIR__ / __APP_USER__ 由 deploy/deploy.sh 渲染后安装。
+# 手工安装时请把这两处替换成你的实际路径与用户（例如 /opt/officerwatch 与 officerwatch）。
+Description=officerwatch - EVE 官员击杀监控
+Documentation=https://github.com/724686158/officerwatch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+Group=__APP_USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/bin/officerwatch -config __APP_DIR__/config.json
+Restart=always
+RestartSec=5
+# 采集是长连接 + 轮询；端口被占之类的配置错误会直接退出，让 systemd 记一笔并重启
+
+StandardOutput=journal
+StandardError=journal
+
+# 加固：只允许写 data 目录（SQLite + WAL）
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=__APP_DIR__/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+# 实测常驻内存约 13 MB；给足余量也远小于单核机器
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

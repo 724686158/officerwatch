@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>官员监控 · Officer Watch</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩸</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="mark">🩸</span>
+    <div>
+      <strong>官员监控</strong>
+      <span class="sub">EVE Officer Watch</span>
+    </div>
+  </div>
+
+  <nav class="nav" id="nav">
+    <a href="#overview" data-tab="overview" class="on">概览</a>
+    <a href="#kills" data-tab="kills">击杀</a>
+    <a href="#officers" data-tab="officers">图鉴</a>
+    <a href="#stats" data-tab="stats">统计</a>
+    <a href="#settings" data-tab="settings">设置</a>
+    <a href="#status" data-tab="status">状态</a>
+  </nav>
+
+  <div class="actions">
+    <span class="live" id="live" title="采集器心跳"><i></i><span>—</span></span>
+    <button class="btn ghost" id="themeBtn" title="切换主题">◐</button>
+    <button class="btn" id="refreshBtn" title="刷新当前页">刷新</button>
+  </div>
+</header>
+
+<main class="wrap">
+  <section id="tab-overview" class="tab on"></section>
+  <section id="tab-kills" class="tab"></section>
+  <section id="tab-officers" class="tab"></section>
+  <section id="tab-stats" class="tab"></section>
+  <section id="tab-settings" class="tab"></section>
+  <section id="tab-status" class="tab"></section>
+</main>
+
+<aside class="drawer" id="drawer" hidden>
+  <div class="drawer-backdrop" data-action="closeDrawer"></div>
+  <div class="drawer-panel" role="dialog" aria-modal="true">
+    <header class="drawer-head">
+      <h2 id="drawerTitle">击杀详情</h2>
+      <button class="btn ghost" data-action="closeDrawer" aria-label="关闭">✕</button>
+    </header>
+    <div class="drawer-body" id="drawerBody"></div>
+  </div>
+</aside>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>

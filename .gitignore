@@ -1,0 +1,16 @@
+# 构建产物与本地产物
+/bin/
+/data/
+*.db
+*.db-wal
+*.db-shm
+
+# 凭据（模板是 config.example.json，真实配置只在服务器上）
+/config.json
+
+# 模块/构建缓存（部署脚本会在仓库内用它们，节省重下）
+/.gomodcache/
+/.gocache/
+
+# 系统垃圾
+.DS_Store

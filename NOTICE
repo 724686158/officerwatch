@@ -1,0 +1,25 @@
+Third-party data and services
+=============================
+
+1) internal/locs/data/celestials.tsv.gz — 星体名索引
+   Derived from CCP hf's EVE Online Static Data Export (SDE), specifically the
+   `mapDenormalize` table, via the community mirror published by Fuzzwork
+   (https://www.fuzzwork.co.uk/dump/). Only four columns are kept
+   (itemID, solarSystemID, groupID, itemName) for celestial objects inside solar
+   systems; the file is gzip-compressed.
+   Regenerate with: ./tools/build-celestials.sh [path/to/mapDenormalize.csv]
+   EVE Online, its data and lore are properties of CCP hf. This project is an
+   unofficial community tool and is not endorsed by or affiliated with CCP.
+
+2) Runtime data sources
+   - zKillboard R2Z2 sequence stream and API (https://r2z2.zkillboard.com,
+     https://zkillboard.com/api/) — killmail feed and metadata.
+   - EVE Swagger Interface / ESI (https://esi.evetech.net) — public read-only
+     endpoints: universe names, killmails, routes.
+   Both are consumed strictly read-only, with a descriptive User-Agent and
+   conservative rate limits.
+
+3) Officials' ship-group list (internal/catalog/catalog.go, KnownGroups)
+   Hand-maintained snapshot of ESI's "Entity" category groups whose names
+   contain "Officer". The authoritative source at runtime is ESI itself
+   (`/universe/categories/11/` + `/universe/groups/{id}/`).
