@@ -293,6 +293,20 @@ label.field { display: inline-flex; align-items: center; gap: 8px; color: var(--
 .kv dt { color: var(--dim); }
 .kv dd { margin: 0; font-variant-numeric: tabular-nums; }
 
+/* 巡检：最近 N 轮小方块 + 当轮检查项 */
+.patrol-dots { display: flex; gap: 4px; align-items: center; }
+.patrol-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--good); opacity: .85; }
+.patrol-dot.bad { background: var(--bad); }
+.patrol-list { display: flex; flex-direction: column; gap: 2px; }
+.patrol-row { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
+.patrol-row:last-child { border-bottom: 0; }
+.patrol-mark { flex: none; width: 16px; text-align: center; font-weight: 700; }
+.patrol-mark.ok { color: var(--good); }
+.patrol-mark.warn { color: var(--warn); }
+.patrol-mark.fail { color: var(--bad); }
+.patrol-label { flex: none; width: 96px; color: var(--dim); }
+.patrol-detail { color: var(--fg); }
+
 .events { list-style: none; margin: 0; padding: 0; max-height: 320px; overflow: auto; }
 .events li { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
 .events li:last-child { border-bottom: 0; }

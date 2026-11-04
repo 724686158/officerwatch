@@ -547,7 +547,10 @@
   // ───────────────────────────── 状态
 
   async function renderStatus() {
-    const d = await api('api/status');
+    const [d, p] = await Promise.all([
+      api('api/status'),
+      api('api/patrol?limit=16').catch(() => ({ items: [], latest: [] })),
+    ]);
     state.status = d;
     updateLive();
     const st = d.stats || {};
@@ -610,6 +613,38 @@
               <dt>通道</dt><dd>${(d.channels || []).map(x => chip('good', x)).join(' ') || chip('', '无')}</dd>
             </dl>
           </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <header>
+          <h2>巡检</h2>
+          <span class="hint">每 5 分钟一轮 · 连续 2 轮失败才发告警</span>
+        </header>
+        <div class="body">
+          ${(() => {
+            const runs = p.items || [];
+            const latest = p.latest || [];
+            if (!runs.length) return empty('还没跑过巡检', '🩺');
+            const dots = runs.slice().reverse().map(x => {
+              const t = fmtTime(x.ts);
+              return `<span class="patrol-dot ${x.ok ? '' : 'bad'}" title="${esc(t + ' · ' + x.summary)}"></span>`;
+            }).join('');
+            const rows = latest.map(c => `
+              <div class="patrol-row">
+                <span class="patrol-mark ${c.status}">${c.status === 'ok' ? '✓' : c.status === 'warn' ? '!' : '✕'}</span>
+                <span class="patrol-label">${esc(c.label)}</span>
+                <span class="patrol-detail">${esc(c.detail || '')}</span>
+              </div>`).join('');
+            const okCount = runs.filter(x => x.ok).length;
+            return `
+              <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+                <span class="patrol-dots">${dots}</span>
+                <span class="hint" style="color:var(--faint)">最近 ${runs.length} 轮，正常 ${okCount} 轮</span>
+                <span class="hint" style="color:var(--faint)">上一轮 ${timeAgo(runs[0].ts)}</span>
+              </div>
+              <div class="patrol-list">${rows}</div>`;
+          })()}
         </div>
       </div>
 

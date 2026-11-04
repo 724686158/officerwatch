@@ -127,6 +127,14 @@ func (s *Store) migrate() error {
 			message TEXT NOT NULL
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts DESC)`,
+		`CREATE TABLE IF NOT EXISTS patrol_runs (
+			id      INTEGER PRIMARY KEY AUTOINCREMENT,
+			ts      TEXT NOT NULL,
+			ok      INTEGER NOT NULL,
+			summary TEXT NOT NULL,
+			checks  TEXT NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_patrol_ts ON patrol_runs(ts DESC)`,
 		`CREATE TABLE IF NOT EXISTS celestials (
 			item_id   INTEGER PRIMARY KEY,
 			system_id INTEGER NOT NULL,
@@ -764,6 +772,53 @@ func (s *Store) CountNotifiedSince(t time.Time) (int, error) {
 	err := s.db.QueryRow(`SELECT COUNT(1) FROM kills WHERE notify_status = 'sent' AND notified_at >= ?`,
 		t.UTC().Format(time.RFC3339)).Scan(&n)
 	return n, err
+}
+
+// ─────────────────────────────── 巡检
+
+// PatrolRun 一轮巡检的记录。
+type PatrolRun struct {
+	ID      int64     `json:"id"`
+	TS      time.Time `json:"ts"`
+	OK      bool      `json:"ok"`
+	Summary string    `json:"summary"`
+	Checks  string    `json:"checks"`
+}
+
+// SavePatrolRun 落一轮巡检结果，只保留最近 200 轮。
+func (s *Store) SavePatrolRun(ts time.Time, ok bool, summary, checks string) (int64, error) {
+	res, err := s.db.Exec(`INSERT INTO patrol_runs(ts, ok, summary, checks) VALUES(?,?,?,?)`,
+		ts.UTC().Format(time.RFC3339), b2i(ok), summary, checks)
+	if err != nil {
+		return 0, err
+	}
+	_, _ = s.db.Exec(`DELETE FROM patrol_runs WHERE id <= (SELECT MAX(id) - 200 FROM patrol_runs)`)
+	return res.LastInsertId()
+}
+
+// ListPatrolRuns 最近 n 轮。
+func (s *Store) ListPatrolRuns(limit int) ([]PatrolRun, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 20
+	}
+	rows, err := s.db.Query(`SELECT id, ts, ok, summary, checks FROM patrol_runs ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []PatrolRun{}
+	for rows.Next() {
+		var r PatrolRun
+		var ok int
+		var ts string
+		if err := rows.Scan(&r.ID, &ts, &ok, &r.Summary, &r.Checks); err != nil {
+			return nil, err
+		}
+		r.TS, _ = time.Parse(time.RFC3339, ts)
+		r.OK = ok == 1
+		out = append(out, r)
+	}
+	return out, rows.Err()
 }
 
 // ─────────────────────────────── events

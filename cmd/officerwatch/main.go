@@ -20,6 +20,7 @@ import (
 	"officerwatch/internal/legacy"
 	"officerwatch/internal/locs"
 	"officerwatch/internal/notify"
+	"officerwatch/internal/patrol"
 	"officerwatch/internal/source"
 	"officerwatch/internal/store"
 	"officerwatch/internal/web"
@@ -124,6 +125,11 @@ func main() {
 
 	col := collect.New(st, res, ec, nt, logger)
 
+	// 启动计数：巡检靠它识别"中途被重启过"
+	var boots int64
+	fmt.Sscanf(st.GetMeta("boot_count"), "%d", &boots)
+	_ = st.SetMeta("boot_count", fmt.Sprint(boots+1))
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -188,6 +194,19 @@ func main() {
 		logger.Error("初始化 HTTP 层失败", "err", err)
 		os.Exit(1)
 	}
+	// 巡检：每 5 分钟体检一次（落后、写库、通道、名录、重启），连续 2 轮失败才告警
+	pr := patrol.New(st, nt, logger,
+		func(c context.Context) (int64, error) { return source.NewR2Z2(cfg.UserAgent).Sequence(c) },
+		func() int64 {
+			if v, ok := col.Stats().LastFetch.Load().(time.Time); ok && !v.IsZero() {
+				return int64(time.Since(v).Seconds())
+			}
+			return -1
+		},
+		func() int64 { return col.Stats().LastSeq.Load() },
+	)
+	go pr.Loop(ctx)
+
 	// 看门狗：采集线程可能"活着但没进展"（网络被掐、DNS 挂了）。
 	// 15 分钟没有一次成功拉取就发一封告警邮件，30 分钟内最多一封。
 	go func() {

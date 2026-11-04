@@ -104,6 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
 
 	mux.HandleFunc("GET /api/status", s.handleStatus)
+	mux.HandleFunc("GET /api/patrol", s.handlePatrol)
 	mux.HandleFunc("POST /api/test-notify", s.handleTestNotify)
 	mux.HandleFunc("POST /api/catalog/sync", s.handleCatalogSync)
 
@@ -618,6 +619,21 @@ func countOrZero(f func() (store.Overview, error)) int64 {
 		return 0
 	}
 	return int64(ov.Total)
+}
+
+// handlePatrol 返回最近若干轮巡检。
+func (s *Server) handlePatrol(w http.ResponseWriter, r *http.Request) {
+	limit := atoi(r.URL.Query().Get("limit"), 20)
+	runs, err := s.st.ListPatrolRuns(limit)
+	if err != nil {
+		writeErr(w, 500, err.Error())
+		return
+	}
+	var latest []map[string]any
+	if len(runs) > 0 {
+		_ = json.Unmarshal([]byte(runs[0].Checks), &latest)
+	}
+	writeJSON(w, 200, map[string]any{"items": runs, "latest": latest})
 }
 
 func (s *Server) handleTestNotify(w http.ResponseWriter, r *http.Request) {
