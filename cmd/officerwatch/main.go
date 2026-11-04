@@ -188,6 +188,40 @@ func main() {
 		logger.Error("初始化 HTTP 层失败", "err", err)
 		os.Exit(1)
 	}
+	// 看门狗：采集线程可能"活着但没进展"（网络被掐、DNS 挂了）。
+	// 15 分钟没有一次成功拉取就发一封告警邮件，30 分钟内最多一封。
+	go func() {
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		var lastAlert time.Time
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+			}
+			stt := col.Stats()
+			v, ok := stt.LastFetch.Load().(time.Time)
+			if !ok || v.IsZero() {
+				continue // 刚启动，还没拉过
+			}
+			idle := time.Since(v)
+			if idle < 15*time.Minute || time.Since(lastAlert) < 30*time.Minute {
+				continue
+			}
+			msg := fmt.Sprintf("officerwatch 采集停摆\n\n最近一次成功拉取：%s（%d 分钟前）\n连续失败：%d 次\n最近错误：%s\n\n"+
+				"服务进程还活着，但拿不到 zKillboard 的序列流。请检查服务器出网 / DNS。",
+				v.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
+				int(idle.Minutes()), stt.ConsecFails.Load(), errText(stt))
+			if err := nt.NotifyRaw(ctx, msg); err != nil {
+				logger.Error("停摆告警发送失败", "err", err)
+			} else {
+				st.AddEvent("error", "collect", fmt.Sprintf("采集停摆 %d 分钟，已发告警邮件", int(idle.Minutes())))
+			}
+			lastAlert = time.Now()
+		}
+	}()
+
 	srv := &http.Server{
 		Addr:              cfg.Listen,
 		Handler:           handler.Handler(),
@@ -271,6 +305,13 @@ func enrichHistory(ctx context.Context, st *store.Store, res *esi.Resolver, zkb 
 		n++
 	}
 	return n, nil
+}
+
+func errText(stt *collect.Stats) string {
+	if v, ok := stt.LastErr.Load().(string); ok && v != "" {
+		return v
+	}
+	return "（无）"
 }
 
 func newLogger(level string) *slog.Logger {

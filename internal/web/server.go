@@ -52,6 +52,9 @@ type Server struct {
 	loginTmpl *template.Template
 
 	settingsMu sync.Mutex
+	headMu     sync.Mutex
+	head       int64
+	headAt     time.Time
 }
 
 // New 构造。
@@ -532,6 +535,11 @@ type Status struct {
 	Config    map[string]any `json:"config"`
 	Events    []store.Event  `json:"events"`
 	Now       time.Time      `json:"now"`
+
+	// 健康度三件套：落后多少条、多久没成功、连续失败几次
+	Lag         int64 `json:"lag"`
+	IdleSec     int64 `json:"idleSec"`
+	ConsecFails int64 `json:"consecFails"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -550,10 +558,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		chans = append(chans, c.Name())
 	}
 	writeJSON(w, 200, Status{
-		Version:   s.ver,
-		StartedAt: s.start,
-		UptimeSec: int64(time.Since(s.start).Seconds()),
-		Source:    s.cfg.Source,
+		Version:     s.ver,
+		StartedAt:   s.start,
+		UptimeSec:   int64(time.Since(s.start).Seconds()),
+		Source:      s.cfg.Source,
+		Lag:         s.seqLag(r.Context(), stt.LastSeq.Load()),
+		IdleSec:     idleSeconds(stt),
+		ConsecFails: stt.ConsecFails.Load(),
 		Stats: map[string]any{
 			"fetched": stt.Fetched.Load(), "matched": stt.Matched.Load(),
 			"stored": stt.Stored.Load(), "notified": stt.Notified.Load(),
@@ -571,6 +582,34 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Events:   events,
 		Now:      time.Now().UTC(),
 	})
+}
+
+// seqLag 当前游标离 R2Z2 的 head 还有多少条（≈积压）。head 缓存 1 分钟，别每次状态查询都打网络。
+func (s *Server) seqLag(ctx context.Context, cursor int64) int64 {
+	s.headMu.Lock()
+	head, at := s.head, s.headAt
+	s.headMu.Unlock()
+	if time.Since(at) > time.Minute {
+		c, cancel := context.WithTimeout(ctx, 6*time.Second)
+		defer cancel()
+		if h, err := source.NewR2Z2(s.cfg.UserAgent).Sequence(c); err == nil {
+			s.headMu.Lock()
+			s.head, s.headAt = h, time.Now()
+			s.headMu.Unlock()
+			head = h
+		}
+	}
+	if head == 0 || cursor == 0 || head < cursor {
+		return 0
+	}
+	return head - cursor
+}
+
+func idleSeconds(stt *collect.Stats) int64 {
+	if v, ok := stt.LastFetch.Load().(time.Time); ok && !v.IsZero() {
+		return int64(time.Since(v).Seconds())
+	}
+	return -1
 }
 
 func countOrZero(f func() (store.Overview, error)) int64 {

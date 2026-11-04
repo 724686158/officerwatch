@@ -27,16 +27,17 @@ import (
 
 // Stats 运行期计数器（状态页用）。
 type Stats struct {
-	Fetched   atomic.Int64
-	Matched   atomic.Int64
-	Stored    atomic.Int64
-	Notified  atomic.Int64
-	Skipped   atomic.Int64
-	Errors    atomic.Int64
-	LastSeq   atomic.Int64
-	LastFetch atomic.Value // time.Time
-	LastErr   atomic.Value // string
-	Started   time.Time
+	Fetched     atomic.Int64
+	Matched     atomic.Int64
+	Stored      atomic.Int64
+	Notified    atomic.Int64
+	Skipped     atomic.Int64
+	Errors      atomic.Int64
+	ConsecFails atomic.Int64 // 连续失败次数（成功即归零）
+	LastSeq     atomic.Int64
+	LastFetch   atomic.Value // time.Time
+	LastErr     atomic.Value // string
+	Started     time.Time
 }
 
 // Collector 采集器。
@@ -316,11 +317,26 @@ func inQuietHours(set store.Settings, now time.Time) bool {
 	return h >= s || h < e
 }
 
+// fail 记录一次采集失败。
+//
+// 单次网络抖动（Cloudflare 偶发 connection reset）不值得往事件表里塞一条，
+// 连续 3 次才记一次事件；恢复时也记一条，方便回看"断了多久"。
 func (c *Collector) fail(err error) {
 	c.stt.Errors.Add(1)
+	n := c.stt.ConsecFails.Add(1)
 	c.stt.LastErr.Store(err.Error())
-	c.log.Error("采集错误", "err", err)
-	c.st.AddEvent("error", "collect", err.Error())
+	if n >= 3 && n%3 == 0 {
+		c.log.Error("采集连续失败", "consecutive", n, "err", err)
+		c.st.AddEvent("error", "collect", fmt.Sprintf("连续 %d 次采集失败: %v", n, err))
+	}
+}
+
+// ok 记录一次成功（复位连续失败计数）。
+func (c *Collector) ok() {
+	if n := c.stt.ConsecFails.Swap(0); n >= 3 {
+		c.log.Info("采集恢复", "after", n)
+		c.st.AddEvent("info", "collect", fmt.Sprintf("采集已恢复（此前连续失败 %d 次）", n))
+	}
 }
 
 // ─────────────────────────────── 运行循环
@@ -366,6 +382,7 @@ func (c *Collector) RunR2Z2(ctx context.Context) error {
 		}
 
 		c.Handle(ctx, p)
+		c.ok()
 		seq++
 		c.stt.LastSeq.Store(seq)
 		_ = c.st.SetMeta("r2z2_seq", fmt.Sprint(seq))

@@ -33,6 +33,7 @@ type Message struct {
 	AtAll      bool     // 只对 QQ 群有意义
 	Home       string   // "家"星系名（抢官员的参照点），用于"距 X N 跳"
 	Recipients []string // 收件人（页面上管理；空则退回 config 里的 smtp.to）
+	Raw        string   // 非击杀类通知（如"采集器停摆"）直接用它当正文
 	Text       string
 	HTML       string
 }
@@ -97,6 +98,15 @@ func (n *Notifier) Notify(ctx context.Context, m Message) error {
 		return firstErr
 	}
 	return nil
+}
+
+// NotifyRaw 发送一条与击杀无关的通知（运维告警用）。
+func (n *Notifier) NotifyRaw(ctx context.Context, text string) error {
+	if len(n.chans) == 0 {
+		return fmt.Errorf("没有已配置的通知通道")
+	}
+	m := Message{Raw: text, Text: text, HTML: "<pre style=\"white-space:pre-wrap;font:13px/1.6 ui-monospace,Menlo,monospace\">" + esc(text) + "</pre>"}
+	return n.Notify(ctx, m)
 }
 
 // SendTest 给每个通道发一条测试消息，返回 通道名 → 结果。
@@ -507,6 +517,9 @@ func (o *OneBot) Name() string { return "onebot" }
 // Send 发一条群消息；@全体是 CQ 码，只在这个通道里加。
 func (o *OneBot) Send(ctx context.Context, m Message) error {
 	text := m.Text
+	if m.Raw != "" {
+		text = m.Raw
+	}
 	if m.AtAll {
 		text = "[CQ:at,qq=all]\n" + text
 	}
