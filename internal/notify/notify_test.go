@@ -1,6 +1,9 @@
 package notify
 
 import (
+	"context"
+	"io"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -103,5 +106,44 @@ func TestOneBotAtAllIsChannelSpecific(t *testing.T) {
 	}
 	if !m.AtAll {
 		t.Fatal("Message 应该记住 AtAll 供 OneBot 使用")
+	}
+}
+
+type captureChan struct{ got []Message }
+
+func (c *captureChan) Name() string { return "capture" }
+func (c *captureChan) Send(_ context.Context, m Message) error {
+	c.got = append(c.got, m)
+	return nil
+}
+
+// 回归测试：测试通知必须一眼看出是测试，不能伪造"Jita / 1.23B / KillID 0"这种
+// 看起来像真实告警的内容（真的收到过以为"官员刷到吉他海四"）。
+func TestSendTestIsClearlyATest(t *testing.T) {
+	cap := &captureChan{}
+	n := New(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	n.Add(cap)
+
+	res := n.SendTest(context.Background(), []string{"a@qq.com", "b@163.com"})
+	if res["capture"] != "成功" {
+		t.Fatalf("发送结果不对: %v", res)
+	}
+	if len(cap.got) != 1 {
+		t.Fatalf("应发 1 条，得到 %d", len(cap.got))
+	}
+	m := cap.got[0]
+	if !strings.Contains(m.Subject, "测试") {
+		t.Errorf("测试邮件标题必须含「测试」，得到 %q", m.Subject)
+	}
+	if !strings.Contains(m.Text, "不是击杀通知") {
+		t.Errorf("正文要说明这不是击杀通知")
+	}
+	for _, bad := range []string{"Jita", "KillID", "ISK"} {
+		if strings.Contains(m.Text, bad) {
+			t.Errorf("测试正文里不该出现 %q（会被误认为真实告警）：\n%s", bad, m.Text)
+		}
+	}
+	if !strings.Contains(m.Text, "a@qq.com") {
+		t.Error("应回显收件人，方便确认配置")
 	}
 }

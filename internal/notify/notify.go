@@ -34,6 +34,7 @@ type Message struct {
 	Home       string   // "家"星系名（抢官员的参照点），用于"距 X N 跳"
 	Recipients []string // 收件人（页面上管理；空则退回 config 里的 smtp.to）
 	Raw        string   // 非击杀类通知（如"采集器停摆"）直接用它当正文
+	Subject    string   // 覆盖邮件标题（非击杀类通知用）
 	Text       string
 	HTML       string
 }
@@ -110,21 +111,47 @@ func (n *Notifier) NotifyRaw(ctx context.Context, text string) error {
 }
 
 // SendTest 给每个通道发一条测试消息，返回 通道名 → 结果。
-// recipients 走和真实告警同一条路径（页面上管理的那份收件人）。
+//
+// 注意：测试消息**必须一眼看出是测试**。早先的实现随手造了一条
+// "Jita / 1.23B / KillID 0" 的假击杀去套真实模板，结果收到的人以为
+// 官员刷到吉他海四了 —— 真实告警的地点来自 killmail，不会凭空出现。
 func (n *Notifier) SendTest(ctx context.Context, recipients []string) map[string]string {
 	out := map[string]string{}
 	if len(n.chans) == 0 {
 		out["-"] = "没有已配置的通知通道"
 		return out
 	}
-	k := store.Kill{
-		KillmailID: 0, OfficerName: "Cormack Vaaja", Faction: "Serpentis",
-		TotalValue: 1.234e9, DroppedValue: 4.2e8, SystemName: "Jita", RegionName: "The Forge",
-		VictimShipName: "Vindicator", KillmailTime: time.Now(),
+	now := time.Now().In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05")
+	who := "（未配置，回退到 config.json 的 smtp.to）"
+	if len(recipients) > 0 {
+		who = strings.Join(recipients, ", ")
 	}
-	m := NewMessage(k, false, "Jita", recipients)
-	m.Text = "🔧 officerwatch 测试消息（配置检查，可忽略）\n\n" + m.Text
-	m.HTML = `<p style="color:#667085">🔧 officerwatch 测试消息（配置检查，可忽略）</p>` + m.HTML
+	text := "officerwatch 测试消息\n\n" +
+		"这不是击杀通知 —— 只是确认通知通道能用。\n\n" +
+		"发送时间：" + now + "（北京时间）\n" +
+		"收件人：" + who + "\n\n" +
+		"收到这封说明链路是通的；真实告警的标题类似：\n" +
+		"[officerwatch] 官员击杀 · <官员名> · <价值>\n" +
+		"正文会带星系、星体、价值拆分、距家跳数。"
+	html := `<div style="background:#f6f7f9;padding:24px 12px;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e6e9ef;border-radius:14px;overflow:hidden">
+    <div style="padding:16px 20px;border-bottom:1px solid #e6e9ef">
+      <div style="color:#667085;font-size:12px;letter-spacing:.06em;text-transform:uppercase">🔧 测试消息</div>
+      <div style="font-size:19px;font-weight:650;color:#161a22;margin-top:4px">通知通道正常</div>
+    </div>
+    <div style="padding:14px 20px 18px;color:#161a22;font-size:14px;line-height:1.7">
+      这不是击杀通知 —— 只是确认<strong>邮件通道能用</strong>。
+      <div style="margin-top:12px;color:#667085;font-size:13px">
+        发送时间：` + now + `（北京时间）<br>
+        收件人：` + esc(who) + `
+      </div>
+      <div style="margin-top:14px;padding:10px 12px;background:#eff4ff;border-radius:10px;color:#2563eb;font-size:12px">
+        真实告警会带：官员名（中英）、吨位、星系 + 星体 + 安全等级、距家跳数、价值拆分、历史排名。
+      </div>
+    </div>
+  </div>
+</div>`
+	m := Message{Raw: text, Text: text, HTML: html, Subject: "测试消息（不是击杀通知）", Recipients: recipients}
 	for _, c := range n.chans {
 		cctx, cancel := context.WithTimeout(ctx, 25*time.Second)
 		err := c.Send(cctx, m)
@@ -454,6 +481,9 @@ func (m *Mail) Send(_ context.Context, msg Message) error {
 
 	subject := fmt.Sprintf("[officerwatch] %s · %s · %s",
 		roleLabel(msg.Kill), msg.Kill.OfficerName, FormatISK(msg.Kill.TotalValue))
+	if msg.Subject != "" {
+		subject = "[officerwatch] " + msg.Subject
+	}
 	// 中文主题必须 RFC 2047 编码，否则 QQ/网易邮件客户端会显示乱码
 	subject = "=?UTF-8?B?" + base64.StdEncoding.EncodeToString([]byte(subject)) + "?="
 
