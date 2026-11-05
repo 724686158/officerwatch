@@ -541,6 +541,8 @@ type Status struct {
 	Lag         int64 `json:"lag"`
 	IdleSec     int64 `json:"idleSec"`
 	ConsecFails int64 `json:"consecFails"`
+	AtFrontier  bool  `json:"atFrontier"` // 已追平上游（等新数据，不是故障）
+	Waits       int64 `json:"waits"`      // 连续 404 次数
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -566,6 +568,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Lag:         s.seqLag(r.Context(), stt.LastSeq.Load()),
 		IdleSec:     idleSeconds(stt),
 		ConsecFails: stt.ConsecFails.Load(),
+		AtFrontier:  stt.AtFrontier.Load(),
+		Waits:       stt.Waits.Load(),
 		Stats: map[string]any{
 			"fetched": stt.Fetched.Load(), "matched": stt.Matched.Load(),
 			"stored": stt.Stored.Load(), "notified": stt.Notified.Load(),

@@ -569,13 +569,16 @@
       </li>`).join('');
 
     const idleSec = d.idleSec ?? -1;
-    const stalled = idleSec > 300 || (d.consecFails || 0) >= 3;
+    // 只有"取不到"才算异常；"已追平、上游没新数据"是正常等待（上游停摆会由看门狗单独说明）
+    const stalled = (d.consecFails || 0) >= 3
+      ? true
+      : (d.atFrontier ? idleSec > 2700 : idleSec > 600);
     const idleStr = idleSec < 0 ? '尚未开始' : (idleSec < 90 ? idleSec + ' 秒前' : idleSec < 5400 ? Math.round(idleSec / 60) + ' 分钟前' : Math.round(idleSec / 3600) + ' 小时前');
 
     $('#tab-status').innerHTML = `
       ${stalled ? `<div class="warn" style="margin:0 0 14px;padding:12px 16px;border-radius:10px;background:var(--warn-soft);border:1px solid var(--warn);color:var(--warn)">
-        ⚠️ 采集可能已停摆：上次成功拉取在 ${esc(idleStr)}${d.consecFails ? `，连续失败 ${d.consecFails} 次` : ''}。
-        服务进程还活着，但拿不到 zKillboard 的序列流 —— 检查服务器出网 / DNS。
+        ⚠️ ${d.consecFails ? `连续失败 ${d.consecFails} 次`: '长时间没有进展'}：上次成功拉取在 ${esc(idleStr)}。
+        ${d.atFrontier ? '已追平上游但长时间没有新击杀 —— 多半是 zKillboard 侧停摆，采集器会自己追上。' : '取不到序列流 —— 检查服务器出网 / DNS。'}
       </div>` : ''}
       <div class="page-head">
         <div><h1>运行状态</h1><p>版本 ${esc(d.version)} · 已运行 ${esc(upStr)} · 数据源 ${esc(d.source)}</p></div>
@@ -595,7 +598,9 @@
               <dt>被口径过滤</dt><dd>${fmtInt(st.skipped)}</dd>
               <dt>错误</dt><dd>${fmtInt(st.errors)}</dd>
               <dt>序列游标</dt><dd class="mono">${esc(st.lastSequence || '—')}</dd>
-              <dt>落后</dt><dd>${d.lag ? d.lag + ' 条' : '实时'}${d.lag && d.lag > 500 ? ' <span class="chip warn">积压</span>' : ''}</dd>
+              <dt>上游状态</dt><dd>${d.atFrontier
+                ? `已追平${d.waits ? `（等新击杀，连续 404 ${d.waits} 次）` : ''}`
+                : d.lag ? `落后 ${d.lag} 条` : '实时'}${d.lag && d.lag > 500 ? ' <span class="chip warn">积压</span>' : ''}</dd>
               <dt>上次成功</dt><dd>${esc(idleStr)}</dd>
               <dt>连续失败</dt><dd style="color:${(d.consecFails || 0) >= 3 ? 'var(--bad)' : 'inherit'}">${d.consecFails || 0}</dd>
               <dt>最近错误</dt><dd style="color:var(--bad)">${esc(st.lastError || '—')}</dd>

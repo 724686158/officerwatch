@@ -41,13 +41,15 @@ type Check struct {
 
 // Inputs 一轮巡检需要的原料（由调用方采集，便于单测）。
 type Inputs struct {
-	IdleSec        int64     // 距上次成功拉取的秒数（-1 = 尚未开始）
-	Lag            int64     // 游标落后 head 多少条
-	Channels       int       // 已配置的通知通道数
-	CatalogSynced  time.Time // 名录上次同步时间
-	DBWriteErr     error     // 探测写库的结果
-	BootCount      int64     // 本机启动次数（递增说明服务重启过）
-	BootCountAdded bool      // 相比上一轮是否增加
+	IdleSec        int64         // 距上次成功拉取的秒数（-1 = 尚未开始）
+	AtFrontier     bool          // 已追平上游：空闲是"没新数据"，不是故障
+	Uptime         time.Duration // 进程已运行时长（刚启动时不做"没拉取"的判断）
+	Lag            int64         // 游标落后 head 多少条
+	Channels       int           // 已配置的通知通道数
+	CatalogSynced  time.Time     // 名录上次同步时间
+	DBWriteErr     error         // 探测写库的结果
+	BootCount      int64         // 本机启动次数（递增说明服务重启过）
+	BootCountAdded bool          // 相比上一轮是否增加
 	Now            time.Time
 }
 
@@ -71,8 +73,16 @@ func Evaluate(in Inputs) []Check {
 
 	// 1) 采集是否新鲜
 	switch {
+	case in.IdleSec < 0 && in.Uptime < 10*time.Minute:
+		// 刚启动、还没轮到第一条（追平上游时可能要等几十秒），别急着报
+		checks = append(checks, Check{"collector_fresh", "采集新鲜度", OK, "刚启动，等待首条数据"})
 	case in.IdleSec < 0:
 		checks = append(checks, Check{"collector_fresh", "采集新鲜度", Warn, "尚未开始拉取"})
+	case in.AtFrontier && in.IdleSec > idleWarnSec:
+		// 追平上游时的空闲不是我们的问题（zKillboard 没产出），记为 warn 而不是 fail，
+		// 真正停摆由主程序的看门狗（45 分钟）单独说明。
+		checks = append(checks, Check{"collector_fresh", "采集新鲜度", Warn,
+			fmt.Sprintf("已追平上游，%d 分钟没有新击杀", in.IdleSec/60)})
 	case in.IdleSec > idleFailSec:
 		checks = append(checks, Check{"collector_fresh", "采集新鲜度", Fail,
 			fmt.Sprintf("%d 分钟没有成功拉取", in.IdleSec/60)})
@@ -171,14 +181,16 @@ func Summary(checks []Check) string {
 
 // Runner 周期巡检。
 type Runner struct {
-	st   *store.Store
-	nt   *notify.Notifier
-	log  *slog.Logger
-	head func(ctx context.Context) (int64, error) // 取 R2Z2 当前 head
-	idle func() int64                             // 距上次成功拉取的秒数
-	cur  func() int64                             // 当前序列游标
+	st         *store.Store
+	nt         *notify.Notifier
+	log        *slog.Logger
+	head       func(ctx context.Context) (int64, error) // 取 R2Z2 当前 head
+	idle       func() int64                             // 距上次成功拉取的秒数
+	atFrontier func() bool                              // 是否已追平上游
+	cur        func() int64                             // 当前序列游标
 
-	Interval time.Duration
+	Interval  time.Duration
+	startedAt time.Time
 
 	// 内部状态
 	failStreak int
@@ -188,8 +200,12 @@ type Runner struct {
 
 // New 构造。
 func New(st *store.Store, nt *notify.Notifier, log *slog.Logger,
-	head func(context.Context) (int64, error), idle, cursor func() int64) *Runner {
-	return &Runner{st: st, nt: nt, log: log, head: head, idle: idle, cur: cursor, Interval: 5 * time.Minute}
+	head func(context.Context) (int64, error), idle, cursor func() int64, atFrontier func() bool) *Runner {
+	if atFrontier == nil {
+		atFrontier = func() bool { return false }
+	}
+	return &Runner{st: st, nt: nt, log: log, head: head, idle: idle, cur: cursor,
+		atFrontier: atFrontier, Interval: 5 * time.Minute, startedAt: time.Now()}
 }
 
 // RunOnce 执行一轮：采集指标 → 评估 → 落库 → 必要时告警。
@@ -218,7 +234,8 @@ func (r *Runner) RunOnce(ctx context.Context) ([]Check, error) {
 	r.lastBoot = boot
 
 	in := Inputs{
-		IdleSec: r.idle(), Lag: lag, Channels: len(r.nt.Channels()),
+		IdleSec: r.idle(), AtFrontier: r.atFrontier(), Uptime: time.Since(r.startedAt),
+		Lag: lag, Channels: len(r.nt.Channels()),
 		CatalogSynced: catalogSynced, DBWriteErr: dbErr,
 		BootCount: boot, BootCountAdded: added, Now: now,
 	}

@@ -204,40 +204,95 @@ func main() {
 			return -1
 		},
 		func() int64 { return col.Stats().LastSeq.Load() },
+		func() bool { return col.Stats().AtFrontier.Load() },
 	)
 	go pr.Loop(ctx)
 
-	// 看门狗：采集线程可能"活着但没进展"（网络被掐、DNS 挂了）。
-	// 15 分钟没有一次成功拉取就发一封告警邮件，30 分钟内最多一封。
+	// 看门狗：区分三种"没动静"，别把上游停摆说成你网络坏了。
+	//   1) 连续失败（连接重置/超时）→ 是我们取不到
+	//   2) 已追平、上游长时间没有新击杀 → 不是我们的问题
+	//   3) 落后上游却取不到 → 本地/网络问题
+	// 另外：R2Z2 停摆超过 10 分钟时，自动启用 zkb 轮询兜底，恢复后自动关掉。
 	go func() {
 		t := time.NewTicker(time.Minute)
 		defer t.Stop()
 		var lastAlert time.Time
+		var fallbackCancel context.CancelFunc
+		const (
+			failAlertAfter   = 10 * time.Minute
+			behindAlertAfter = 15 * time.Minute
+			upstreamIdle     = 45 * time.Minute
+			alertCooldown    = 30 * time.Minute
+			fallbackAfter    = 10 * time.Minute
+		)
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-t.C:
 			}
+
 			stt := col.Stats()
-			v, ok := stt.LastFetch.Load().(time.Time)
-			if !ok || v.IsZero() {
+			idle := idleSince(stt)
+			if idle < 0 {
 				continue // 刚启动，还没拉过
 			}
-			idle := time.Since(v)
-			if idle < 15*time.Minute || time.Since(lastAlert) < 30*time.Minute {
-				continue
+			fails := stt.ConsecFails.Load()
+			atFrontier := stt.AtFrontier.Load()
+
+			var (
+				title string
+				body  string
+				alert bool
+			)
+			switch {
+			case fails >= 3 && idle >= failAlertAfter:
+				title = "连不上 zKillboard"
+				body = fmt.Sprintf("连续 %d 次拉取失败，已 %d 分钟没有成功。\n最近错误：%s\n\n"+
+					"服务进程正常，是我们到 r2z2.zkillboard.com 的网络不通（连接重置/超时）。\n"+
+					"服务器本身可能没问题，先看看出网和 DNS。", fails, int(idle.Minutes()), errText(stt))
+				alert = true
+			case !atFrontier && idle >= behindAlertAfter:
+				title = "采集落后于上游"
+				body = fmt.Sprintf("游标 %d，已 %d 分钟没有取到新数据，但上游在推进。\n最近错误：%s\n\n"+
+					"这是本地侧问题（网络抖动/请求被限），检查出网。", stt.LastSeq.Load(), int(idle.Minutes()), errText(stt))
+				alert = true
+			case atFrontier && idle >= upstreamIdle:
+				title = "上游停摆（不是你这边的问题）"
+				body = fmt.Sprintf("本机已追平上游（游标 %d），但 zKillboard 已经 %d 分钟没有产生新击杀。\n\n"+
+					"R2Z2 的机制是「每解析一条击杀生成一个序列文件」，全服平均每 6 秒一条；"+
+					"连续 %d 分钟没有新文件，基本可以判定是上游管线卡住，不是采集器故障。\n"+
+					"采集器会在恢复后自动追上，不用处理。", stt.LastSeq.Load(), int(idle.Minutes()), int(idle.Minutes()))
+				alert = true
 			}
-			msg := fmt.Sprintf("officerwatch 采集停摆\n\n最近一次成功拉取：%s（%d 分钟前）\n连续失败：%d 次\n最近错误：%s\n\n"+
-				"服务进程还活着，但拿不到 zKillboard 的序列流。请检查服务器出网 / DNS。",
-				v.In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04:05"),
-				int(idle.Minutes()), stt.ConsecFails.Load(), errText(stt))
-			if err := nt.NotifyRaw(ctx, msg); err != nil {
-				logger.Error("停摆告警发送失败", "err", err)
-			} else {
-				st.AddEvent("error", "collect", fmt.Sprintf("采集停摆 %d 分钟，已发告警邮件", int(idle.Minutes())))
+
+			if alert && time.Since(lastAlert) >= alertCooldown {
+				msg := "officerwatch 巡检告警\n\n" + title + "\n\n" + body +
+					"\n\n时间：" + time.Now().In(time.FixedZone("CST", 8*3600)).Format("2006-01-02 15:04")
+				if err := nt.NotifyRaw(ctx, msg); err != nil {
+					logger.Error("看门狗告警发送失败", "err", err)
+				} else {
+					st.AddEvent("error", "collect", title)
+					lastAlert = time.Now()
+				}
 			}
-			lastAlert = time.Now()
+
+			// 兜底：R2Z2 静默 → 用 zkb 按船型轮询，至少不漏掉那 8 位官员
+			if cfg.Source == "r2z2" || cfg.Source == "" {
+				switch {
+				case idle >= fallbackAfter && fallbackCancel == nil:
+					fctx, cancel := context.WithCancel(ctx)
+					fallbackCancel = cancel
+					go func() { _ = col.RunZKB(fctx, 5*time.Minute) }()
+					logger.Warn("R2Z2 无进展，启动 zkb 轮询兜底")
+					st.AddEvent("warn", "collect", "R2Z2 无进展，启用 zkb 轮询兜底")
+				case idle < 2*time.Minute && fallbackCancel != nil:
+					fallbackCancel()
+					fallbackCancel = nil
+					logger.Info("R2Z2 恢复，停止 zkb 兜底")
+					st.AddEvent("info", "collect", "R2Z2 恢复，停止 zkb 兜底")
+				}
+			}
 		}
 	}()
 
@@ -324,6 +379,14 @@ func enrichHistory(ctx context.Context, st *store.Store, res *esi.Resolver, zkb 
 		n++
 	}
 	return n, nil
+}
+
+// idleSince 距上次成功拉取的秒数；-1 表示还没开始。
+func idleSince(stt *collect.Stats) time.Duration {
+	if v, ok := stt.LastFetch.Load().(time.Time); ok && !v.IsZero() {
+		return time.Since(v)
+	}
+	return -1
 }
 
 func errText(stt *collect.Stats) string {

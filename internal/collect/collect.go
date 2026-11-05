@@ -35,8 +35,11 @@ type Stats struct {
 	Errors      atomic.Int64
 	ConsecFails atomic.Int64 // 连续失败次数（成功即归零）
 	LastSeq     atomic.Int64
-	LastFetch   atomic.Value // time.Time
+	LastFetch   atomic.Value // time.Time 最近一次成功取到文件
+	LastAdvance atomic.Value // time.Time 游标上次真正前进（确实收到了新击杀）
 	LastErr     atomic.Value // string
+	AtFrontier  atomic.Bool  // 已追平上游（404 是"还没新数据"，不是故障）
+	Waits       atomic.Int64 // 连续 404 次数
 	Started     time.Time
 }
 
@@ -350,6 +353,7 @@ func (c *Collector) RunR2Z2(ctx context.Context) error {
 	c.log.Info("R2Z2 开始", "from", seq)
 	c.st.AddEvent("info", "collect", fmt.Sprintf("R2Z2 采集启动，起始序列 %d", seq))
 
+	var lastFrontierCheck time.Time
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -357,6 +361,24 @@ func (c *Collector) RunR2Z2(ctx context.Context) error {
 		p, err := c.r2z2.Fetch(ctx, seq)
 		switch {
 		case errors.Is(err, source.ErrNotYet):
+			// 404 = 这个序列还没生成。**这不一定是故障**：
+			//   - 追平上游时，每个新击杀到达前都会 404（正常空闲）
+			//   - 追平但上游也没新数据时，会一直 404（上游停摆，不是我们的问题）
+			//   - 我们落后于 head 却一直 404，才是本地/网络问题
+			// 所以每 3 分钟对照一次 head 判个方向，别把"等数据"当成"采集停了"。
+			c.stt.AtFrontier.Store(true)
+			c.stt.Waits.Add(1)
+			if time.Since(lastFrontierCheck) > 3*time.Minute {
+				lastFrontierCheck = time.Now()
+				if head, herr := c.r2z2.Sequence(ctx); herr == nil {
+					if head > seq {
+						c.stt.AtFrontier.Store(false)
+						c.fail(fmt.Errorf("落后于上游：游标 %d，head %d（本地取不到）", seq, head))
+					} else {
+						c.ok() // 追平等待，算健康
+					}
+				}
+			}
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
@@ -383,8 +405,11 @@ func (c *Collector) RunR2Z2(ctx context.Context) error {
 
 		c.Handle(ctx, p)
 		c.ok()
+		c.stt.AtFrontier.Store(false)
+		c.stt.Waits.Store(0)
 		seq++
 		c.stt.LastSeq.Store(seq)
+		c.stt.LastAdvance.Store(time.Now())
 		_ = c.st.SetMeta("r2z2_seq", fmt.Sprint(seq))
 
 		// 官方限流 15/s，这里 10/s，留余量。

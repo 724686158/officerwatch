@@ -50,6 +50,23 @@ func TestEvaluateIdleDegrades(t *testing.T) {
 	}
 }
 
+func TestEvaluateFrontierIdleIsWarnNotFail(t *testing.T) {
+	// 已追平上游时空闲 40 分钟：不是我们坏了，只该 warn
+	checks := Evaluate(Inputs{IdleSec: 40 * 60, AtFrontier: true, Channels: 1, Now: now()})
+	c := byName(checks, "collector_fresh")
+	if c.Status != Warn {
+		t.Errorf("追平上游空闲应为 warn，得到 %s（%s）", c.Status, c.Detail)
+	}
+	if HasFailure(checks) {
+		t.Error("追平上游空闲不该判定为失败")
+	}
+	// 没追平却空闲 40 分钟，仍然 fail
+	checks2 := Evaluate(Inputs{IdleSec: 40 * 60, Channels: 1, Now: now()})
+	if byName(checks2, "collector_fresh").Status != Fail {
+		t.Error("落后且空闲 40 分钟应判 fail")
+	}
+}
+
 func TestEvaluateLag(t *testing.T) {
 	if c := byName(Evaluate(Inputs{IdleSec: 1, Lag: 800, Channels: 1, Now: now()}), "collector_lag"); c.Status != Warn {
 		t.Errorf("落后 800 应为 warn，得到 %s", c.Status)
