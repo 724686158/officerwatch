@@ -24,6 +24,10 @@ type Config struct {
 	Source             string `json:"source"`             // r2z2 | zkb | both，默认 r2z2
 	ZKBIntervalSeconds int    `json:"zkbIntervalSeconds"` // zkb 模式轮询间隔，默认 600
 
+	// NotifyMaxAgeMinutes 推送时效门槛：比这更老的击杀只入库、不推送。
+	// 兜底轮询（zkb 按船型）一次会带回最多 200 条历史击杀，不设门槛就会邮件轰炸。
+	NotifyMaxAgeMinutes int `json:"notifyMaxAgeMinutes"`
+
 	OneBot struct {
 		URL     string `json:"url"`
 		Token   string `json:"token"`
@@ -113,6 +117,9 @@ func (c *Config) applyDefaults() {
 	}
 	if c.ZKBIntervalSeconds <= 0 {
 		c.ZKBIntervalSeconds = 600
+	}
+	if c.NotifyMaxAgeMinutes <= 0 {
+		c.NotifyMaxAgeMinutes = 30
 	}
 	if c.LogLevel == "" {
 		c.LogLevel = "info"

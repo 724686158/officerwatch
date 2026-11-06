@@ -124,6 +124,7 @@ func main() {
 		"source", cfg.Source, "channels", chNames)
 
 	col := collect.New(st, res, ec, nt, logger)
+	col.SetMaxNotifyAge(time.Duration(cfg.NotifyMaxAgeMinutes) * time.Minute)
 
 	// 启动计数：巡检靠它识别"中途被重启过"
 	var boots int64

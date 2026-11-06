@@ -574,6 +574,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 			"fetched": stt.Fetched.Load(), "matched": stt.Matched.Load(),
 			"stored": stt.Stored.Load(), "notified": stt.Notified.Load(),
 			"skipped": stt.Skipped.Load(), "errors": stt.Errors.Load(),
+			"backfilled":   stt.Backfilled.Load(),
 			"lastSequence": stt.LastSeq.Load(), "lastFetch": lastFetch, "lastError": lastErr,
 		},
 		DB: map[string]any{"sizeBytes": s.st.Size(),

@@ -130,3 +130,28 @@ func TestDecide(t *testing.T) {
 		}
 	})
 }
+
+func TestFreshEnough(t *testing.T) {
+	now := time.Date(2026, 11, 6, 4, 32, 0, 0, time.UTC)
+	cases := []struct {
+		name string
+		t    time.Time
+		want bool
+	}{
+		{"刚刚", now.Add(-30 * time.Second), true},
+		{"5 分钟前", now.Add(-5 * time.Minute), true},
+		{"29 分钟前", now.Add(-29 * time.Minute), true},
+		{"31 分钟前", now.Add(-31 * time.Minute), false},
+		{"昨天的", now.Add(-24 * time.Hour), false},
+		{"零值", time.Time{}, false},
+	}
+	for _, c := range cases {
+		if got := FreshEnough(c.t, now, 30*time.Minute); got != c.want {
+			t.Errorf("%s：FreshEnough=%v，期望 %v", c.name, got, c.want)
+		}
+	}
+	// 门槛为 0 时用默认 30 分钟
+	if FreshEnough(now.Add(-45*time.Minute), now, 0) {
+		t.Error("maxAge=0 应退回 30 分钟默认值，45 分钟前的不该推送")
+	}
+}

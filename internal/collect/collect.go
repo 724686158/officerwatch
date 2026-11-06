@@ -40,6 +40,7 @@ type Stats struct {
 	LastErr     atomic.Value // string
 	AtFrontier  atomic.Bool  // 已追平上游（404 是"还没新数据"，不是故障）
 	Waits       atomic.Int64 // 连续 404 次数
+	Backfilled  atomic.Int64 // 历史击杀（只入库、不推送）
 	Started     time.Time
 }
 
@@ -47,10 +48,12 @@ type Stats struct {
 type Collector struct {
 	st  *store.Store
 	res *esi.Resolver
-	ec  *esi.Client
-	nt  *notify.Notifier
-	log *slog.Logger
-	stt *Stats
+	// maxNotifyAge 超过这个年龄的击杀只入库不推送（防止兜底轮询把历史当新闻）
+	maxNotifyAge time.Duration
+	ec           *esi.Client
+	nt           *notify.Notifier
+	log          *slog.Logger
+	stt          *Stats
 
 	r2z2 *source.R2Z2
 	zkb  *source.ZKB
@@ -69,14 +72,15 @@ type RunConfig struct {
 // New 构造采集器。
 func New(st *store.Store, res *esi.Resolver, ec *esi.Client, nt *notify.Notifier, log *slog.Logger) *Collector {
 	return &Collector{
-		st:   st,
-		res:  res,
-		ec:   ec,
-		nt:   nt,
-		log:  log,
-		stt:  &Stats{Started: time.Now()},
-		r2z2: source.NewR2Z2(""),
-		zkb:  source.NewZKB(""),
+		st:           st,
+		res:          res,
+		maxNotifyAge: 30 * time.Minute,
+		ec:           ec,
+		nt:           nt,
+		log:          log,
+		stt:          &Stats{Started: time.Now()},
+		r2z2:         source.NewR2Z2(""),
+		zkb:          source.NewZKB(""),
 	}
 }
 
@@ -146,6 +150,26 @@ func (c *Collector) Import(ctx context.Context, p *model.Payload) (bool, error) 
 	}
 	matched, _, err := c.process(ctx, p, all)
 	return matched, err
+}
+
+// FreshEnough 判断一条击杀是否"新到值得推送"。
+//
+// 为什么不只看 R2Z2：兜底用的 zkb 接口返回的是"最近 200 条"，可能横跨几个月。
+func FreshEnough(killTime, now time.Time, maxAge time.Duration) bool {
+	if killTime.IsZero() {
+		return false // 时间解析失败的宁可当历史，别乱发
+	}
+	if maxAge <= 0 {
+		maxAge = 30 * time.Minute
+	}
+	return now.Sub(killTime) <= maxAge
+}
+
+// SetMaxNotifyAge 调整推送时效门槛（默认 30 分钟）。
+func (c *Collector) SetMaxNotifyAge(d time.Duration) {
+	if d > 0 {
+		c.maxNotifyAge = d
+	}
 }
 
 // process 是采集与导入的公共路径：匹配 → 入库 → 按口径通知。
@@ -230,6 +254,16 @@ func (c *Collector) process(ctx context.Context, p *model.Payload, officers map[
 		return true, false, nil
 	}
 	c.stt.Stored.Add(1)
+
+	// 时效门槛：太老的击杀只入库、不推送。
+	// zkb 兜底轮询一次会拉回某官员最近 200 条击杀，其中大量是几个月前的历史；
+	// 不设门槛就是邮件轰炸（2026-11-06 凌晨踩过：一条消息发了 12 封老警报）。
+	if !FreshEnough(k.KillmailTime, time.Now(), c.maxNotifyAge) {
+		c.stt.Backfilled.Add(1)
+		_ = c.st.MarkNotify(k.KillmailID, "backfill", "历史击杀，仅入库不推送")
+		c.log.Info("历史击杀仅入库", "kill", k.KillmailID, "killTime", k.KillmailTime.Format(time.RFC3339))
+		return true, true, nil
+	}
 
 	// 通知口径
 	st := c.st.LoadSettings()
